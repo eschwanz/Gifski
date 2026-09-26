@@ -4,7 +4,6 @@ import UniformTypeIdentifiers
 struct MainScreen: View {
 	@Environment(AppState.self) private var appState
 	@State private var isDropTargeted = false
-	@State private var isWelcomeScreenPresented = false
 
 	var body: some View {
 		@Bindable var appState = appState
@@ -87,25 +86,6 @@ struct MainScreen: View {
 				}
 			)
 		)
-		.alert2(
-			"Welcome to Gifski!",
-			message:
-				"""
-				Keep in mind that the GIF image format is very space inefficient. Only convert short video clips unless you want huge files.
-
-				If you have any feedback, bug reports, or feature requests, use the feedback button in the “Help” menu. We quickly respond to all submissions.
-
-				Known issue: Dragging from a Dock folder into the window doesn't work because of a macOS bug.
-				""",
-			isPresented: $isWelcomeScreenPresented
-		) {
-			Button("Get Started") {}
-		}
-		.task {
-			if SSApp.isFirstLaunch {
-				isWelcomeScreenPresented = true
-			}
-		}
 		.task {
 			#if DEBUG
 //			appState.isFileImporterPresented = true
