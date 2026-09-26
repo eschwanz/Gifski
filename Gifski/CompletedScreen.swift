@@ -39,7 +39,14 @@ struct CompletedScreen: View {
 		}
 		.fillFrame()
 		.safeAreaInset(edge: .bottom) {
-			controls
+			VStack(spacing: 6) {
+				Text("Final GIF size: \(finalFileSize)")
+					.font(.subheadline.weight(.medium))
+				Text("\(data.count.formatted(.number.grouping(.automatic))) bytes")
+					.font(.caption)
+					.foregroundStyle(.secondary)
+				controls
+			}
 		}
 		.scenePadding()
 		.fileExporter(
@@ -96,6 +103,10 @@ struct CompletedScreen: View {
 			showDragTipIfNeeded()
 			requestReviewIfNeeded()
 		}
+	}
+
+	private var finalFileSize: String {
+		ByteCountFormatter.string(fromByteCount: Int64(data.count), countStyle: .file)
 	}
 
 	private var controls: some View {
