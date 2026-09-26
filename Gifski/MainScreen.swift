@@ -18,6 +18,10 @@ struct MainScreen: View {
 							.id(url)
 					case .conversion(let conversion):
 						ConversionScreen(conversion: conversion)
+					case .imageSequence(let job):
+						ImageSequenceScreen(job: job)
+					case .imageSequenceConversion(let job):
+						ImageSequenceConversionScreen(job: job)
 					case .completed(let data, let url, let sourceURL):
 						CompletedScreen(data: data, url: url, sourceURL: sourceURL)
 					}
@@ -26,7 +30,8 @@ struct MainScreen: View {
 		.frame(width: 760, height: 640)
 		.fileImporter(
 			isPresented: $appState.isFileImporterPresented,
-			allowedContentTypes: Device.supportedVideoTypes
+			allowedContentTypes: Device.supportedVideoTypes + [.image],
+			allowsMultipleSelection: true
 		) {
 			do {
 				appState.start(try $0.get())
@@ -35,7 +40,7 @@ struct MainScreen: View {
 			}
 		}
 		.fileDialogCustomizationID("import")
-		.fileDialogMessage("Choose a MP4 or MOV video to convert to an animated GIF")
+		.fileDialogMessage("Choose a video or two or more still images to convert to an animated GIF")
 		.fileDialogDefaultDirectory(.downloadsDirectory)
 //		.backgroundWithMaterial(.underWindowBackground, blendingMode: .behindWindow)
 		.alert(error: $appState.error)
@@ -72,12 +77,12 @@ struct MainScreen: View {
 
 					Do not "simplify" this back to opening `firstMovieFileURL` directly. That regressed window drops in 3.0.x.
 					*/
-					guard let itemProvider = $0.itemProviders(for: [.fileURL]).first else {
+					let itemProviders = $0.itemProviders(for: [.fileURL])
+					guard !itemProviders.isEmpty else {
 						return false
 					}
 
-					appState.start(itemProvider)
-
+					appState.start(itemProviders)
 					return true
 				}
 			)
