@@ -10,7 +10,7 @@ struct AppMain: App {
 	}
 
 	var body: some Scene {
-		Window(SSApp.name, id: "main") {
+		Window("Gif’in Stills", id: "main") {
 			MainScreen()
 				.environment(appState)
 		}
@@ -60,7 +60,7 @@ struct AppMain: App {
 				Link(
 					"Source Code",
 					systemImage: "chevron.left.forwardslash.chevron.right",
-					destination: "https://github.com/sindresorhus/Gifski"
+					destination: "https://github.com/eschwanz/Gifski"
 				)
 				Link(
 					"Gifski Library",
