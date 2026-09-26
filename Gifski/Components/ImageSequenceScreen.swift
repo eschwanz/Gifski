@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct ImageSequenceScreen: View {
 	@Environment(AppState.self) private var appState
@@ -7,43 +8,53 @@ struct ImageSequenceScreen: View {
 	@State private var previewIndex = 0
 	@State private var isPlaying = true
 	@State private var isAddingImages = false
+	@State private var isDropTargeted = false
 
 	init(job: ImageSequenceJob) {
 		self._job = .init(initialValue: job)
 	}
 
 	var body: some View {
-		VStack(spacing: 16) {
+		VStack(spacing: 12) {
 			preview
-			settings
+			compactSettings
 			frameList
-			bottomBar
 		}
-		.padding(20)
-		.navigationTitle(job.displayName)
+		.padding(.horizontal, 18)
+		.padding(.top, 12)
+		.navigationTitle("Gif’in Stills")
+		.navigationSubtitle("\(job.urls.count) frames • \(sequenceDuration.formatted(.number.precision(.fractionLength(2)))) s")
+		.safeAreaInset(edge: .bottom) {
+			bottomBar
+				.padding(.horizontal, 18)
+				.padding(.vertical, 10)
+				.background(.ultraThinMaterial)
+		}
 		.fileImporter(
 			isPresented: $isAddingImages,
 			allowedContentTypes: [.image],
 			allowsMultipleSelection: true
 		) { result in
 			do {
-				let urls = try result.get()
-				guard !urls.isEmpty else {
-					return
-				}
-
-				for url in urls {
-					_ = url.startAccessingSecurityScopedResource()
-				}
-
-				job.urls.append(contentsOf: urls)
-				job.urls = Array(Set(job.urls)).sorted {
-					$0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending
-				}
-				previewIndex = min(previewIndex, max(0, job.urls.count - 1))
+				addImages(try result.get())
 			} catch {
 				appState.error = error
 			}
+		}
+		.border(isDropTargeted ? Color.accentColor : .clear, width: 4, cornerRadius: 10)
+		.onDrop(of: [UTType.fileURL.identifier], isTargeted: $isDropTargeted) { providers in
+			Task {
+				var urls = [URL]()
+				for provider in providers {
+					if let url = await provider.getURL(), ImageSequenceLoader.isImage(url) {
+						urls.append(url)
+					}
+				}
+				await MainActor.run {
+					addImages(urls)
+				}
+			}
+			return true
 		}
 		.task(id: previewTaskID) {
 			while !Task.isCancelled {
@@ -64,120 +75,94 @@ struct ImageSequenceScreen: View {
 	}
 
 	private var preview: some View {
-		VStack(spacing: 8) {
-			ZStack {
-				Rectangle()
-					.fill(.black.opacity(0.08))
+		ZStack(alignment: .bottomTrailing) {
+			RoundedRectangle(cornerRadius: 10)
+				.fill(.black.opacity(0.06))
 
-				if
-					!job.urls.isEmpty,
-					let image = NSImage(contentsOf: job.urls[previewIndex])
-				{
-					Image(nsImage: image)
-						.resizable()
-						.scaledToFit()
-						.padding(12)
-				} else {
-					ContentUnavailableView("No Preview", systemImage: "photo.on.rectangle.angled")
-				}
+			if
+				!job.urls.isEmpty,
+				let image = NSImage(contentsOf: job.urls[previewIndex])
+			{
+				Image(nsImage: image)
+					.resizable()
+					.scaledToFit()
+					.padding(10)
+			} else {
+				ContentUnavailableView("Drop Images Here", systemImage: "photo.on.rectangle.angled")
 			}
-			.frame(height: 250)
-			.clipShape(.rect(cornerRadius: 10))
 
-			HStack {
+			HStack(spacing: 8) {
 				Button {
 					isPlaying.toggle()
 				} label: {
-					Label(isPlaying ? "Pause" : "Play", systemImage: isPlaying ? "pause.fill" : "play.fill")
+					Image(systemName: isPlaying ? "pause.fill" : "play.fill")
 				}
-
-				Spacer()
+				.buttonStyle(.glass)
 
 				Text("\(previewIndex + 1) / \(job.urls.count)")
 					.monospacedDigit()
+					.font(.caption)
 					.foregroundStyle(.secondary)
 			}
+			.padding(10)
 		}
+		.frame(height: 205)
 	}
 
-	private var settings: some View {
-		Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 10) {
-			GridRow {
-				Text("Frame rate")
-				.gridColumnAlignment(.trailing)
-				.foregroundStyle(.secondary)
-				.frame(width: 90, alignment: .trailing)
-
-				HStack {
-					Stepper(value: $job.frameRate, in: 3...50) {
-						Text("\(job.frameRate) FPS")
-							.monospacedDigit()
-					}
+	private var compactSettings: some View {
+		HStack(spacing: 18) {
+			LabeledContent("Speed") {
+				Stepper(value: $job.frameRate, in: 3...50) {
+					Text("\(job.frameRate) FPS")
+						.monospacedDigit()
 				}
 			}
 
-			GridRow {
-				Text("Quality")
-					.foregroundStyle(.secondary)
+			Divider()
+				.frame(height: 28)
 
-				HStack {
+			LabeledContent("Quality") {
+				HStack(spacing: 8) {
 					Slider(value: $job.quality, in: 0.1...1, step: 0.05)
+						.frame(width: 110)
 					Text(job.quality.formatted(.percent.precision(.fractionLength(0))))
 						.monospacedDigit()
-						.frame(width: 48, alignment: .trailing)
+						.frame(width: 42, alignment: .trailing)
 				}
 			}
 
-			GridRow {
-				Text("Size")
-					.foregroundStyle(.secondary)
+			Divider()
+				.frame(height: 28)
 
-				HStack {
-					TextField("Width", value: $job.outputWidth, format: .number)
-						.frame(width: 82)
-					Text("×")
-						.foregroundStyle(.secondary)
-					TextField("Height", value: $job.outputHeight, format: .number)
-						.frame(width: 82)
-					Text("px")
-						.foregroundStyle(.secondary)
-				}
-			}
-
-			GridRow {
-				Text("Playback")
-					.foregroundStyle(.secondary)
-
-				HStack(spacing: 18) {
-					Toggle("Loop", isOn: $job.loop)
-					Toggle("Bounce", isOn: $job.bounce)
-				}
-			}
+			Toggle("Loop", isOn: $job.loop)
+			Toggle("Bounce", isOn: $job.bounce)
 		}
-		.textFieldStyle(.roundedBorder)
+		.controlSize(.small)
+		.padding(.horizontal, 4)
 	}
 
 	private var frameList: some View {
-		VStack(alignment: .leading, spacing: 8) {
+		VStack(alignment: .leading, spacing: 6) {
 			HStack {
 				Text("Frames")
 					.font(.headline)
-				Text("\(job.urls.count)")
-					.foregroundStyle(.secondary)
 				Spacer()
-				Button("Add Images…", systemImage: "plus") {
+				Text("\(job.outputWidth) × \(job.outputHeight) px")
+					.font(.caption)
+					.foregroundStyle(.secondary)
+				Button("Add", systemImage: "plus") {
 					isAddingImages = true
 				}
 			}
 
 			List {
 				ForEach(Array(job.urls.enumerated()), id: \.element) { index, url in
-					HStack(spacing: 10) {
+					HStack(spacing: 8) {
 						if let image = NSImage(contentsOf: url) {
 							Image(nsImage: image)
 								.resizable()
 								.scaledToFill()
-								.frame(width: 52, height: 40)
+								.frame(width: 44, height: 32)
 								.clipped()
 								.clipShape(.rect(cornerRadius: 4))
 						}
@@ -185,9 +170,6 @@ struct ImageSequenceScreen: View {
 						Text(url.lastPathComponent)
 							.lineLimit(1)
 						Spacer()
-						Text("#\(index + 1)")
-							.monospacedDigit()
-							.foregroundStyle(.secondary)
 
 						Button {
 							moveFrame(at: index, by: -1)
@@ -212,21 +194,23 @@ struct ImageSequenceScreen: View {
 					}
 				}
 			}
-			.frame(height: 180)
+			.frame(maxHeight: .infinity)
 		}
 	}
 
 	private var bottomBar: some View {
 		HStack {
-			Text(sequenceDuration, format: .number.precision(.fractionLength(2)))
-				.monospacedDigit()
-				.foregroundStyle(.secondary)
-			Text("seconds")
-				.foregroundStyle(.secondary)
+			Button("Add Images", systemImage: "plus") {
+				isAddingImages = true
+			}
 
 			Spacer()
 
-			Button("Convert to GIF", systemImage: "sparkles") {
+			Text("\(job.urls.count) frames • \(sequenceDuration.formatted(.number.precision(.fractionLength(2)))) s")
+				.font(.caption)
+				.foregroundStyle(.secondary)
+
+			Button("Create GIF", systemImage: "sparkles") {
 				guard job.outputWidth > 0, job.outputHeight > 0 else {
 					appState.error = ImageSequenceError.invalidDimensions
 					return
@@ -242,6 +226,23 @@ struct ImageSequenceScreen: View {
 	private var sequenceDuration: Double {
 		let frameCount = job.bounce ? (job.urls.count * 2 - 1) : job.urls.count
 		return Double(frameCount) / Double(max(job.frameRate, 1))
+	}
+
+	private func addImages(_ urls: [URL]) {
+		let imageURLs = urls.filter(ImageSequenceLoader.isImage)
+		guard !imageURLs.isEmpty else {
+			return
+		}
+
+		for url in imageURLs {
+			_ = url.startAccessingSecurityScopedResource()
+		}
+
+		job.urls.append(contentsOf: imageURLs)
+		job.urls = Array(Set(job.urls)).sorted {
+			$0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending
+		}
+		previewIndex = min(previewIndex, max(0, job.urls.count - 1))
 	}
 
 	private func moveFrame(at index: Int, by offset: Int) {
@@ -276,14 +277,14 @@ struct ImageSequenceConversionScreen: View {
 			ProgressView(value: progress)
 				.progressViewStyle(.circular)
 				.controlSize(.large)
-			Text("Converting Image Sequence")
+			Text("Creating GIF")
 				.font(.headline)
 			Text(progress, format: .percent.precision(.fractionLength(0)))
 				.monospacedDigit()
 				.foregroundStyle(.secondary)
 		}
 		.fillFrame()
-		.navigationTitle("")
+		.navigationTitle("Gif’in Stills")
 		.task(priority: .utility) {
 			do {
 				try await convert()
