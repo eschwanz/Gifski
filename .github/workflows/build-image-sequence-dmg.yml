@@ -1,0 +1,79 @@
+name: Build Image Sequence DMG
+
+on:
+  push:
+    branches:
+      - feature/image-sequences
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-26
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Tool versions
+        run: |
+          xcodebuild -version
+          swift --version
+          rustc --version || true
+
+      - name: Install SwiftLint
+        run: brew install swiftlint
+
+      - name: Resolve packages
+        run: xcodebuild -resolvePackageDependencies -project Gifski.xcodeproj -scheme Gifski
+
+      - name: Build app
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project Gifski.xcodeproj \
+            -scheme Gifski \
+            -configuration Release \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM="" \
+            build | tee "$RUNNER_TEMP/xcodebuild.log"
+
+      - name: Locate app
+        id: app
+        run: |
+          APP_PATH="$(find "$RUNNER_TEMP/DerivedData/Build/Products/Release" -maxdepth 1 -name 'Gifski.app' -print -quit)"
+          test -n "$APP_PATH"
+          echo "path=$APP_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: Ad-hoc sign app
+        run: codesign --force --deep --sign - "${{ steps.app.outputs.path }}"
+
+      - name: Package DMG
+        run: |
+          mkdir -p "$RUNNER_TEMP/dmg"
+          cp -R "${{ steps.app.outputs.path }}" "$RUNNER_TEMP/dmg/Gifski.app"
+          ln -s /Applications "$RUNNER_TEMP/dmg/Applications"
+          hdiutil create \
+            -volname "Gifski Image Sequences" \
+            -srcfolder "$RUNNER_TEMP/dmg" \
+            -ov \
+            -format UDZO \
+            "$RUNNER_TEMP/Gifski-Image-Sequences.dmg"
+
+      - name: Upload DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: Gifski-Image-Sequences-DMG
+          path: ${{ runner.temp }}/Gifski-Image-Sequences.dmg
+          if-no-files-found: error
+
+      - name: Upload build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcodebuild-log
+          path: ${{ runner.temp }}/xcodebuild.log
+          if-no-files-found: ignore
