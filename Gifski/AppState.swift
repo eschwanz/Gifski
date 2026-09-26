@@ -56,11 +56,12 @@ final class AppState {
 	}
 
 	var isConverting: Bool {
-		guard case .conversion = navigationPath.last else {
-			return false
+		switch navigationPath.last {
+		case .conversion, .imageSequenceConversion:
+			true
+		default:
+			false
 		}
-
-		return true
 	}
 
 	var navigationPath = [Route]()
@@ -348,34 +349,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 			return
 		}
 
-		guard
-			urls.count == 1,
-			let videoUrl = urls.first
-		else {
-			ImportLog.shared.error(
-				"Rejected open URLs event because it contained \(urls.count) files",
-				"Rejected open URLs event because it contained \(urls.count) files"
-			)
-			NSAlert.showModal(
-				for: SSApp.swiftUIMainWindow,
-				title: "Gifski can only convert a single file at a time."
-			)
-
+		guard !urls.isEmpty else {
 			return
 		}
 
-		guard let videoUrl2 = AppState.shared.extractSharedVideoUrlIfAny(from: videoUrl) else {
-			ImportLog.shared.error("Rejected open URLs event because no usable video URL could be resolved", "Rejected open URLs event because no usable video URL could be resolved")
+		if urls.count == 1, let url = urls.first, !ImageSequenceLoader.isImage(url) {
+			guard let videoURL = AppState.shared.extractSharedVideoUrlIfAny(from: url) else {
+				return
+		}
+
+			LaunchCompletions.add {
+				AppState.shared.start(videoURL)
+			}
 			return
 		}
 
-		// Start video conversion on launch
 		LaunchCompletions.add {
-			ImportLog.shared.info(
-				"Running queued open video completion: pathExtension=\(videoUrl2.pathExtension)",
-				"Running queued open video completion: filename=\(videoUrl2.lastPathComponent), pathExtension=\(videoUrl2.pathExtension)"
-			)
-			AppState.shared.start(videoUrl2)
+			AppState.shared.start(urls)
 		}
 	}
 
