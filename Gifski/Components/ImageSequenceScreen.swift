@@ -17,7 +17,7 @@ struct ImageSequenceScreen: View {
 	var body: some View {
 		VStack(spacing: 12) {
 			preview
-			compactSettings
+			outputSettings
 			frameList
 		}
 		.padding(.horizontal, 18)
@@ -68,6 +68,9 @@ struct ImageSequenceScreen: View {
 				previewIndex = (previewIndex + 1) % job.urls.count
 			}
 		}
+		.onChange(of: job.socialVideoPreset) {
+			applySocialPreset()
+		}
 	}
 
 	private var previewTaskID: String {
@@ -106,38 +109,67 @@ struct ImageSequenceScreen: View {
 			}
 			.padding(10)
 		}
-		.frame(height: 205)
+		.frame(height: 190)
 	}
 
-	private var compactSettings: some View {
-		HStack(spacing: 18) {
-			LabeledContent("Speed") {
-				Stepper(value: $job.frameRate, in: 3...50) {
-					Text("\(job.frameRate) FPS")
-						.monospacedDigit()
+	private var outputSettings: some View {
+		VStack(spacing: 8) {
+			HStack(spacing: 16) {
+				Picker("Format", selection: $job.outputFormat) {
+					ForEach(ImageSequenceOutputFormat.allCases) {
+						Text($0.rawValue).tag($0)
+					}
+				}
+				.pickerStyle(.segmented)
+				.frame(width: 150)
+
+				LabeledContent("Speed") {
+					Stepper(value: $job.frameRate, in: 3...50) {
+						Text("\(job.frameRate) FPS")
+							.monospacedDigit()
+					}
+				}
+
+				Toggle("Bounce", isOn: $job.bounce)
+
+				if job.outputFormat == .gif {
+					Toggle("Loop", isOn: $job.loop)
+
+					LabeledContent("Quality") {
+						HStack(spacing: 6) {
+							Slider(value: $job.quality, in: 0.1...1, step: 0.05)
+								.frame(width: 90)
+							Text(job.quality.formatted(.percent.precision(.fractionLength(0))))
+								.monospacedDigit()
+								.frame(width: 40, alignment: .trailing)
+						}
+					}
 				}
 			}
+			.controlSize(.small)
 
-			Divider()
-				.frame(height: 28)
+			if job.outputFormat == .mp4 {
+				HStack {
+					Picker("Social preset", selection: $job.socialVideoPreset) {
+						ForEach(SocialVideoPreset.allCases) { preset in
+							VStack(alignment: .leading) {
+								Text(preset.rawValue)
+								Text(preset.detail)
+							}
+							.tag(preset)
+						}
+					}
+					.frame(width: 330)
 
-			LabeledContent("Quality") {
-				HStack(spacing: 8) {
-					Slider(value: $job.quality, in: 0.1...1, step: 0.05)
-						.frame(width: 110)
-					Text(job.quality.formatted(.percent.precision(.fractionLength(0))))
-						.monospacedDigit()
-						.frame(width: 42, alignment: .trailing)
+					Spacer()
+
+					Text("\(job.outputWidth) × \(job.outputHeight) • H.264")
+						.font(.caption)
+						.foregroundStyle(.secondary)
 				}
+				.controlSize(.small)
 			}
-
-			Divider()
-				.frame(height: 28)
-
-			Toggle("Loop", isOn: $job.loop)
-			Toggle("Bounce", isOn: $job.bounce)
 		}
-		.controlSize(.small)
 		.padding(.horizontal, 4)
 	}
 
@@ -210,22 +242,39 @@ struct ImageSequenceScreen: View {
 				.font(.caption)
 				.foregroundStyle(.secondary)
 
-			Button("Create GIF", systemImage: "sparkles") {
+			Button(createButtonTitle, systemImage: "sparkles") {
 				guard job.outputWidth > 0, job.outputHeight > 0 else {
 					appState.error = ImageSequenceError.invalidDimensions
 					return
 				}
 
-				appState.navigationPath.append(.imageSequenceConversion(job))
+				switch job.outputFormat {
+				case .gif:
+					appState.navigationPath.append(.imageSequenceConversion(job))
+				case .mp4:
+					appState.navigationPath.append(.imageSequenceVideoConversion(job))
+				}
 			}
 			.buttonStyle(.borderedProminent)
 			.keyboardShortcut(.return, modifiers: [.command])
 		}
 	}
 
+	private var createButtonTitle: String {
+		job.outputFormat == .gif ? "Create GIF" : "Create MP4"
+	}
+
 	private var sequenceDuration: Double {
 		let frameCount = job.bounce ? (job.urls.count * 2 - 1) : job.urls.count
 		return Double(frameCount) / Double(max(job.frameRate, 1))
+	}
+
+	private func applySocialPreset() {
+		guard let dimensions = job.socialVideoPreset.dimensions else {
+			return
+		}
+		job.outputWidth = dimensions.width
+		job.outputHeight = dimensions.height
 	}
 
 	private func addImages(_ urls: [URL]) {
