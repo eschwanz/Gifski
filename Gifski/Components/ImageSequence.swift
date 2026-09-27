@@ -283,8 +283,9 @@ extension AppState {
 			$0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending
 		}
 
+		releaseImageSequenceSecurityScopedAccess()
 		for url in sortedURLs {
-			_ = url.startAccessingSecurityScopedResource()
+			beginImageSequenceSecurityScopedAccess(url)
 		}
 
 		do {
