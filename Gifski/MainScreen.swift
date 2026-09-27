@@ -69,11 +69,6 @@ struct MainScreen: View {
 						return true
 					}
 
-					// Validate synchronously that the dropped file is a movie before `AppState.start(_:)` resets navigation for the new import.
-					guard $0.firstMovieFileURL != nil else {
-						return false
-					}
-
 					/*
 					IMPORTANT: Open the URL from the item provider, not from `firstMovieFileURL`/the drag pasteboard.
 
