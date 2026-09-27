@@ -1737,13 +1737,8 @@ extension SSApp {
 	- Note: Call this lazily only when actually needed as otherwise it won't get the live info.
 	*/
 	static func appFeedbackUrl() -> URL {
-		let info: [String: String] = [
-			"product": name,
-			"metadata": debugInfo
-		]
+		URL("https://github.com/eschwanz/Gifski/issues")
 
-		return URL("https://sindresorhus.com/feedback").settingQueryItems(from: info)
-	}
 }
 
 extension SSApp {
