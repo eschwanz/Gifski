@@ -83,12 +83,12 @@ private struct SplashArtwork: View {
 					.frame(width: size.height * 0.25)
 					.position(x: size.width * 0.95, y: size.height * 0.11)
 
-				cloud
+				SplashCloud()
 					.fill(red)
 					.frame(width: size.width * 0.17, height: size.height * 0.10)
 					.position(x: size.width * 0.80, y: size.height * 0.16)
 
-				cloud
+				SplashCloud()
 					.fill(red)
 					.frame(width: size.width * 0.20, height: size.height * 0.11)
 					.position(x: size.width * 0.12, y: size.height * 0.84)
@@ -139,13 +139,13 @@ private struct SplashArtwork: View {
 				}
 
 				// Abstract geometric accents.
-				triangle
+				SplashTriangle()
 					.fill(red)
 					.frame(width: 54, height: 58)
 					.rotationEffect(.degrees(-8))
 					.position(x: size.width * 0.64, y: size.height * 0.27)
 
-				triangle
+				SplashTriangle()
 					.fill(orange)
 					.frame(width: 72, height: 84)
 					.rotationEffect(.degrees(12))
@@ -213,22 +213,6 @@ private struct SplashArtwork: View {
 			.shadow(color: .black.opacity(0.04), radius: 10, y: 5)
 	}
 
-	private var triangle: Path {
-		Path { path in
-			path.move(to: CGPoint(x: 0.5, y: 0))
-			path.addLine(to: CGPoint(x: 1, y: 1))
-			path.addLine(to: CGPoint(x: 0, y: 1))
-			path.closeSubpath()
-		}
-	}
-
-	private var cloud: Path {
-		Path { path in
-			path.addRoundedRect(in: CGRect(x: 0.08, y: 0.43, width: 0.84, height: 0.40), cornerSize: CGSize(width: 0.20, height: 0.20))
-			path.addEllipse(in: CGRect(x: 0.18, y: 0.18, width: 0.34, height: 0.52))
-			path.addEllipse(in: CGRect(x: 0.42, y: 0.08, width: 0.38, height: 0.62))
-	}
-
 	private var dotPositions: [CGPoint] {
 		[
 			.init(x: 0.07, y: 0.10),
@@ -248,5 +232,49 @@ private struct SplashArtwork: View {
 
 	private var dotColors: [Color] {
 		[blue, orange, yellow, red, cyan]
+	}
+}
+
+
+private struct SplashTriangle: Shape {
+	func path(in rect: CGRect) -> Path {
+		Path { path in
+			path.move(to: CGPoint(x: rect.midX, y: rect.minY))
+			path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+			path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+			path.closeSubpath()
+		}
+	}
+}
+
+private struct SplashCloud: Shape {
+	func path(in rect: CGRect) -> Path {
+		Path { path in
+			path.addRoundedRect(
+				in: CGRect(
+					x: rect.minX + rect.width * 0.08,
+					y: rect.minY + rect.height * 0.43,
+					width: rect.width * 0.84,
+					height: rect.height * 0.40
+				),
+				cornerSize: CGSize(width: rect.width * 0.20, height: rect.height * 0.20)
+			)
+			path.addEllipse(
+				in: CGRect(
+					x: rect.minX + rect.width * 0.18,
+					y: rect.minY + rect.height * 0.18,
+					width: rect.width * 0.34,
+					height: rect.height * 0.52
+				)
+			)
+			path.addEllipse(
+				in: CGRect(
+					x: rect.minX + rect.width * 0.42,
+					y: rect.minY + rect.height * 0.08,
+					width: rect.width * 0.38,
+					height: rect.height * 0.62
+				)
+			)
+		}
 	}
 }
