@@ -274,11 +274,6 @@ extension AppState {
 			return
 		}
 
-		guard urls.count >= 2 else {
-			error = ImageSequenceError.notEnoughImages
-			return
-		}
-
 		let sortedURLs = urls.sorted {
 			$0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending
 		}
