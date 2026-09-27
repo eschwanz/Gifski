@@ -4,6 +4,53 @@ import Foundation
 import ImageIO
 import UniformTypeIdentifiers
 
+enum ImageSequenceOutputFormat: String, CaseIterable, Identifiable, Hashable {
+	case gif = "GIF"
+	case mp4 = "MP4"
+
+	var id: Self { self }
+}
+
+enum SocialVideoPreset: String, CaseIterable, Identifiable, Hashable {
+	case custom = "Custom"
+	case instagramSquare = "Instagram Square"
+	case instagramPortrait = "Instagram Portrait"
+	case reelsStoriesTikTok = "Reels / Stories / TikTok"
+	case youtubeLandscape = "YouTube / LinkedIn Landscape"
+
+	var id: Self { self }
+
+	var dimensions: (width: Int, height: Int)? {
+		switch self {
+		case .custom:
+			nil
+		case .instagramSquare:
+			(1080, 1080)
+		case .instagramPortrait:
+			(1080, 1350)
+		case .reelsStoriesTikTok:
+			(1080, 1920)
+		case .youtubeLandscape:
+			(1920, 1080)
+		}
+	}
+
+	var detail: String {
+		switch self {
+		case .custom:
+			"Use the current dimensions."
+		case .instagramSquare:
+			"1:1 • 1080 × 1080"
+		case .instagramPortrait:
+			"4:5 • 1080 × 1350"
+		case .reelsStoriesTikTok:
+			"9:16 • 1080 × 1920"
+		case .youtubeLandscape:
+			"16:9 • 1920 × 1080"
+		}
+	}
+}
+
 struct ImageSequenceJob: Hashable {
 	var urls: [URL]
 	var frameRate: Int
@@ -12,6 +59,8 @@ struct ImageSequenceJob: Hashable {
 	var bounce: Bool
 	var outputWidth: Int
 	var outputHeight: Int
+	var outputFormat: ImageSequenceOutputFormat
+	var socialVideoPreset: SocialVideoPreset
 
 	init(
 		urls: [URL],
@@ -20,7 +69,9 @@ struct ImageSequenceJob: Hashable {
 		loop: Bool = true,
 		bounce: Bool = false,
 		outputWidth: Int,
-		outputHeight: Int
+		outputHeight: Int,
+		outputFormat: ImageSequenceOutputFormat = .gif,
+		socialVideoPreset: SocialVideoPreset = .custom
 	) {
 		self.urls = urls
 		self.frameRate = frameRate
@@ -29,6 +80,8 @@ struct ImageSequenceJob: Hashable {
 		self.bounce = bounce
 		self.outputWidth = outputWidth
 		self.outputHeight = outputHeight
+		self.outputFormat = outputFormat
+		self.socialVideoPreset = socialVideoPreset
 	}
 
 	var sourceURL: URL {
