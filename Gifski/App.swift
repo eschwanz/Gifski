@@ -66,7 +66,11 @@ struct AppMain: App {
 				Button("Copy Logs", systemImage: "doc.on.clipboard") {
 					appState.copyDiagnosticLogs()
 				}
-				SendFeedbackButton()
+				Link(
+					"Report Issue",
+					systemImage: "exclamationmark.bubble",
+					destination: "https://github.com/eschwanz/Gifski/issues"
+				)
 			}
 		}
 		Settings {
@@ -79,7 +83,6 @@ struct AppMain: App {
 			"NSApplicationCrashOnExceptions": true
 		])
 
-		SSApp.initSentry("https://0ab0665326c54956f3caa10fc2f525d1@o844094.ingest.sentry.io/4505991507738624")
 
 		SSApp.setUpExternalEventListeners()
 	}
