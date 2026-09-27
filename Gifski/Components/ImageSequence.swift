@@ -38,7 +38,7 @@ enum SocialVideoPreset: String, CaseIterable, Identifiable, Hashable {
 	var detail: String {
 		switch self {
 		case .custom:
-			"Use the current dimensions."
+			"Use custom dimensions."
 		case .instagramSquare:
 			"1:1 • 1080 × 1080"
 		case .instagramPortrait:
@@ -89,8 +89,26 @@ struct ImageSequenceJob: Hashable {
 	}
 
 	var displayName: String {
-		let folderName = sourceURL.deletingLastPathComponent().lastPathComponent
-		return folderName.isEmpty ? "Image Sequence" : folderName
+		"\(sourceURL.filenameWithoutExtension)-animation"
+	}
+
+	var frameIndices: [Int] {
+		let forward = Array(urls.indices)
+		guard bounce, urls.count > 1 else {
+			return forward
+		}
+		return forward + Array((0..<(urls.count - 1)).reversed())
+	}
+
+	var duration: Double {
+		Double(frameIndices.count) / Double(max(frameRate, 1))
+	}
+
+	var effectiveMP4Dimensions: (width: Int, height: Int) {
+		(
+			max(2, outputWidth - (outputWidth % 2)),
+			max(2, outputHeight - (outputHeight % 2))
+		)
 	}
 }
 
@@ -109,7 +127,7 @@ enum ImageSequenceError: LocalizedError {
 		case .unreadableImage(let url):
 			"Could not read \(url.lastPathComponent)."
 		case .invalidDimensions:
-			"The output dimensions must be greater than zero."
+			"The output dimensions must be at least 2 × 2 pixels."
 		}
 	}
 }
@@ -119,31 +137,41 @@ enum ImageSequenceLoader {
 		url.contentType?.conforms(to: .image) == true
 	}
 
+	/**
+	Loads an image with its EXIF/HEIC orientation applied.
+	*/
 	static func loadCGImage(_ url: URL) throws -> CGImage {
-		guard
-			let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-			let image = CGImageSourceCreateImageAtIndex(
-				source,
-				0,
-				[
-					kCGImageSourceShouldCacheImmediately: true,
-					kCGImageSourceShouldAllowFloat: true
-				] as CFDictionary
-			)
-		else {
+		guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else {
+			throw ImageSequenceError.unreadableImage(url)
+		}
+
+		let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
+		let pixelWidth = properties?[kCGImagePropertyPixelWidth] as? Int ?? 1
+		let pixelHeight = properties?[kCGImagePropertyPixelHeight] as? Int ?? 1
+		let maximumPixelSize = max(pixelWidth, pixelHeight)
+
+		let options = [
+			kCGImageSourceCreateThumbnailFromImageAlways: true,
+			kCGImageSourceCreateThumbnailWithTransform: true,
+			kCGImageSourceThumbnailMaxPixelSize: maximumPixelSize,
+			kCGImageSourceShouldCacheImmediately: true,
+			kCGImageSourceShouldAllowFloat: true
+		] as CFDictionary
+
+		guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options) else {
 			throw ImageSequenceError.unreadableImage(url)
 		}
 
 		return image
 	}
 
+	/**
+	Fits the source image into the output canvas without stretching it. Empty canvas areas remain transparent;
+	the MP4 exporter composites that result over white because H.264 does not support alpha.
+	*/
 	static func normalizedImage(_ image: CGImage, width: Int, height: Int) throws -> CGImage {
-		guard width > 0, height > 0 else {
+		guard width >= 2, height >= 2 else {
 			throw ImageSequenceError.invalidDimensions
-		}
-
-		if image.width == width, image.height == height {
-			return image
 		}
 
 		guard let context = CGContext(
@@ -158,8 +186,22 @@ enum ImageSequenceLoader {
 			throw ImageSequenceError.invalidDimensions
 		}
 
+		context.clear(CGRect(x: 0, y: 0, width: width, height: height))
 		context.interpolationQuality = .high
-		context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+
+		let scale = min(
+			Double(width) / Double(image.width),
+			Double(height) / Double(image.height)
+		)
+		let drawWidth = Double(image.width) * scale
+		let drawHeight = Double(image.height) * scale
+		let drawRect = CGRect(
+			x: (Double(width) - drawWidth) / 2,
+			y: (Double(height) - drawHeight) / 2,
+			width: drawWidth,
+			height: drawHeight
+		)
+		context.draw(image, in: drawRect)
 
 		guard let result = context.makeImage() else {
 			throw ImageSequenceError.invalidDimensions
@@ -178,18 +220,9 @@ actor ImageSequenceGenerator {
 			throw ImageSequenceError.notEnoughImages
 		}
 
-		guard job.outputWidth > 0, job.outputHeight > 0 else {
+		guard job.outputWidth >= 2, job.outputHeight >= 2 else {
 			throw ImageSequenceError.invalidDimensions
 		}
-
-		let orderedIndices: [Int] = {
-			let forward = Array(job.urls.indices)
-			guard job.bounce, job.urls.count > 1 else {
-				return forward
-			}
-
-			return forward + Array((0..<(job.urls.count - 1)).reversed())
-		}()
 
 		let loop: Gifski.Loop = job.loop ? .forever : .never
 		let gifski = try Gifski(
@@ -200,6 +233,7 @@ actor ImageSequenceGenerator {
 
 		let frameRate = Double(job.frameRate.clamped(to: Int(Constants.allowedFrameRate.lowerBound)...Int(Constants.allowedFrameRate.upperBound)))
 		let frameDuration = 1 / frameRate
+		let orderedIndices = job.frameIndices
 
 		for (outputIndex, sourceIndex) in orderedIndices.enumerated() {
 			try Task.checkCancellation()
@@ -257,6 +291,10 @@ extension AppState {
 			let firstImage = try ImageSequenceLoader.loadCGImage(sortedURLs[0])
 			let job = ImageSequenceJob(
 				urls: sortedURLs,
+				frameRate: Defaults[.outputFPS],
+				quality: Defaults[.outputQuality],
+				loop: Defaults[.loopGIF],
+				bounce: Defaults[.bounceGIF],
 				outputWidth: firstImage.width,
 				outputHeight: firstImage.height
 			)
