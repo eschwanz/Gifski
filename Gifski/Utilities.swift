@@ -5507,8 +5507,12 @@ extension DropInfo {
 
 	The movie check also keeps us out of the way of screenshot drags, which use the same promise mechanism but promise a `public.png` file.
 	*/
+	var filePromiseReceivers: [NSFilePromiseReceiver] {
+		NSPasteboard(name: .drag).filePromiseReceivers
+	}
+
 	var firstMovieFilePromiseReceiver: NSFilePromiseReceiver? {
-		NSPasteboard(name: .drag).filePromiseReceivers.first { receiver in
+		filePromiseReceivers.first { receiver in
 			receiver.fileTypes.contains {
 				UTType($0)?.conforms(to: .movie) == true
 			}
