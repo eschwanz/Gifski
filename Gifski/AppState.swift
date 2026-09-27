@@ -270,6 +270,35 @@ final class AppState {
 
 	The promise source writes the file into a directory we own before it tears down its own temporary file, so the video remains available. This avoids the race in the plain drag-pasteboard path where the source deletes its temporary file before the async open resolves, losing the recording.
 	*/
+	func start(_ promiseReceivers: [NSFilePromiseReceiver]) {
+		guard !isOpeningVideo else {
+			return
+		}
+
+		guard !promiseReceivers.isEmpty else {
+			return
+		}
+
+		isOpeningVideo = true
+
+		Task { [self] in
+			do {
+				var urls = [URL]()
+				for receiver in promiseReceivers {
+					for try await url in try receiver.receivePromisedFile() {
+						urls.append(url)
+						break
+					}
+				}
+
+				isOpeningVideo = false
+				start(urls)
+			} catch {
+				handlePromisedVideoError(error)
+			}
+		}
+	}
+
 	func start(_ promiseReceiver: NSFilePromiseReceiver) {
 		guard !isOpeningVideo else {
 			ImportLog.shared.info(
