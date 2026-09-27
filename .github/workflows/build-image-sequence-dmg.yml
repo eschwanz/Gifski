@@ -1,5 +1,9 @@
 name: Build Gif'in Stills DMG
 
+concurrency:
+  group: gif-in-stills-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches:
