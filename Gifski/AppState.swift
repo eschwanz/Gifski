@@ -8,7 +8,7 @@ private final class ImportLog {
 	static let shared = ImportLog()
 
 	private let logger = Logger(
-		subsystem: Bundle.main.bundleIdentifier ?? "com.sindresorhus.Gifski",
+		subsystem: Bundle.main.bundleIdentifier ?? "com.gifinstills.GifInStills",
 		category: "Import"
 	)
 
