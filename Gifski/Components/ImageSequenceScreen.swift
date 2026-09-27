@@ -5,28 +5,32 @@ import UniformTypeIdentifiers
 struct ImageSequenceScreen: View {
 	@Environment(AppState.self) private var appState
 	@State private var job: ImageSequenceJob
-	@State private var previewIndex = 0
+	@State private var previewPosition = 0
 	@State private var isPlaying = true
 	@State private var isAddingImages = false
 	@State private var isDropTargeted = false
+	@State private var customWidth: Int
+	@State private var customHeight: Int
 
 	init(job: ImageSequenceJob) {
 		self._job = .init(initialValue: job)
+		self._customWidth = .init(initialValue: job.outputWidth)
+		self._customHeight = .init(initialValue: job.outputHeight)
 	}
 
 	var body: some View {
-		VStack(spacing: 12) {
+		VStack(spacing: 10) {
 			preview
-			outputSettings
+			settingsCard
 			frameList
 		}
-		.padding(.horizontal, 18)
-		.padding(.top, 12)
+		.padding(.horizontal, 16)
+		.padding(.top, 10)
 		.navigationTitle("Gif’in Stills")
-		.navigationSubtitle("\(job.urls.count) frames • \(sequenceDuration.formatted(.number.precision(.fractionLength(2)))) s")
+		.navigationSubtitle("\(job.urls.count) images • \(job.duration.formatted(.number.precision(.fractionLength(2)))) s")
 		.safeAreaInset(edge: .bottom) {
 			bottomBar
-				.padding(.horizontal, 18)
+				.padding(.horizontal, 16)
 				.padding(.vertical, 10)
 				.background(.ultraThinMaterial)
 		}
@@ -61,20 +65,31 @@ struct ImageSequenceScreen: View {
 				let nanoseconds = UInt64((1_000_000_000 / Double(max(job.frameRate, 1))).rounded())
 				try? await Task.sleep(nanoseconds: nanoseconds)
 
-				guard isPlaying, !job.urls.isEmpty else {
+				guard isPlaying, !job.frameIndices.isEmpty else {
 					continue
 				}
 
-				previewIndex = (previewIndex + 1) % job.urls.count
+				previewPosition = (previewPosition + 1) % job.frameIndices.count
 			}
 		}
 		.onChange(of: job.socialVideoPreset) {
 			applySocialPreset()
 		}
+		.onChange(of: job.outputFormat) {
+			applyOutputFormat()
+		}
 	}
 
 	private var previewTaskID: String {
-		"\(job.frameRate)-\(job.urls.count)-\(isPlaying)"
+		"\(job.frameRate)-\(job.urls.count)-\(job.bounce)-\(isPlaying)"
+	}
+
+	private var previewSourceIndex: Int {
+		let indices = job.frameIndices
+		guard !indices.isEmpty else {
+			return 0
+		}
+		return indices[previewPosition.clamped(to: 0...(indices.count - 1))]
 	}
 
 	private var preview: some View {
@@ -83,13 +98,13 @@ struct ImageSequenceScreen: View {
 				.fill(.black.opacity(0.06))
 
 			if
-				!job.urls.isEmpty,
-				let image = NSImage(contentsOf: job.urls[previewIndex])
+				job.urls.indices.contains(previewSourceIndex),
+				let image = NSImage(contentsOf: job.urls[previewSourceIndex])
 			{
 				Image(nsImage: image)
 					.resizable()
 					.scaledToFit()
-					.padding(10)
+					.padding(8)
 			} else {
 				ContentUnavailableView("Drop Images Here", systemImage: "photo.on.rectangle.angled")
 			}
@@ -102,75 +117,162 @@ struct ImageSequenceScreen: View {
 				}
 				.buttonStyle(.glass)
 
-				Text("\(previewIndex + 1) / \(job.urls.count)")
+				Text("\(previewSourceIndex + 1) / \(job.urls.count)")
 					.monospacedDigit()
 					.font(.caption)
 					.foregroundStyle(.secondary)
 			}
-			.padding(10)
+			.padding(8)
 		}
-		.frame(height: 190)
+		.frame(height: 180)
 	}
 
-	private var outputSettings: some View {
-		VStack(spacing: 8) {
-			HStack(spacing: 16) {
-				Picker("Format", selection: $job.outputFormat) {
-					ForEach(ImageSequenceOutputFormat.allCases) {
-						Text($0.rawValue).tag($0)
+	private var settingsCard: some View {
+		VStack(alignment: .leading, spacing: 10) {
+			ViewThatFits(in: .horizontal) {
+				HStack(spacing: 14) {
+					formatControl
+					speedControl
+					Toggle("Bounce", isOn: $job.bounce)
+					if job.outputFormat == .gif {
+						Toggle("Loop", isOn: $job.loop)
+					}
+					Spacer(minLength: 0)
+					if job.outputFormat == .gif {
+						qualityControl
 					}
 				}
-				.pickerStyle(.segmented)
-				.frame(width: 150)
 
-				LabeledContent("Speed") {
-					Stepper(value: $job.frameRate, in: 3...50) {
-						Text("\(job.frameRate) FPS")
-							.monospacedDigit()
-					}
-				}
-
-				Toggle("Bounce", isOn: $job.bounce)
-
-				if job.outputFormat == .gif {
-					Toggle("Loop", isOn: $job.loop)
-
-					LabeledContent("Quality") {
-						HStack(spacing: 6) {
-							Slider(value: $job.quality, in: 0.1...1, step: 0.05)
-								.frame(width: 90)
-							Text(job.quality.formatted(.percent.precision(.fractionLength(0))))
-								.monospacedDigit()
-								.frame(width: 40, alignment: .trailing)
+				VStack(alignment: .leading, spacing: 8) {
+					HStack(spacing: 14) {
+						formatControl
+						speedControl
+						Toggle("Bounce", isOn: $job.bounce)
+						if job.outputFormat == .gif {
+							Toggle("Loop", isOn: $job.loop)
 						}
+					}
+					if job.outputFormat == .gif {
+						qualityControl
 					}
 				}
 			}
-			.controlSize(.small)
 
-			if job.outputFormat == .mp4 {
-				HStack {
-					Picker("Social preset", selection: $job.socialVideoPreset) {
-						ForEach(SocialVideoPreset.allCases) { preset in
-							VStack(alignment: .leading) {
-								Text(preset.rawValue)
-								Text(preset.detail)
-							}
-							.tag(preset)
-						}
+			Divider()
+
+			ViewThatFits(in: .horizontal) {
+				HStack(spacing: 14) {
+					dimensionsControl
+					if job.outputFormat == .mp4 {
+						socialPresetControl
 					}
-					.frame(width: 330)
-
-					Spacer()
-
-					Text("\(job.outputWidth) × \(job.outputHeight) • H.264")
-						.font(.caption)
-						.foregroundStyle(.secondary)
+					Spacer(minLength: 0)
+					outputSummary
 				}
-				.controlSize(.small)
+
+				VStack(alignment: .leading, spacing: 8) {
+					dimensionsControl
+					if job.outputFormat == .mp4 {
+						socialPresetControl
+					}
+					outputSummary
+				}
 			}
 		}
-		.padding(.horizontal, 4)
+		.controlSize(.small)
+		.padding(10)
+		.background(.quaternary.opacity(0.35), in: .rect(cornerRadius: 10))
+	}
+
+	private var formatControl: some View {
+		Picker("Format", selection: $job.outputFormat) {
+			ForEach(ImageSequenceOutputFormat.allCases) {
+				Text($0.rawValue).tag($0)
+			}
+		}
+		.pickerStyle(.segmented)
+		.frame(width: 145)
+	}
+
+	private var speedControl: some View {
+		HStack(spacing: 6) {
+			Text("Speed")
+			Stepper(value: $job.frameRate, in: 3...50) {
+				Text("\(job.frameRate) FPS")
+					.monospacedDigit()
+			}
+		}
+	}
+
+	private var qualityControl: some View {
+		HStack(spacing: 6) {
+			Text("Quality")
+			Slider(value: $job.quality, in: 0.1...1, step: 0.05)
+				.frame(width: 100)
+			Text(job.quality.formatted(.percent.precision(.fractionLength(0))))
+				.monospacedDigit()
+				.frame(width: 40, alignment: .trailing)
+		}
+	}
+
+	private var dimensionsControl: some View {
+		HStack(spacing: 6) {
+			Text("Size")
+			TextField("W", value: widthBinding, format: .number)
+				.frame(width: 70)
+				.multilineTextAlignment(.trailing)
+			Text("×")
+			TextField("H", value: heightBinding, format: .number)
+				.frame(width: 70)
+				.multilineTextAlignment(.trailing)
+			Text("px")
+				.foregroundStyle(.secondary)
+		}
+	}
+
+	private var socialPresetControl: some View {
+		Picker("Preset", selection: $job.socialVideoPreset) {
+			ForEach(SocialVideoPreset.allCases) { preset in
+				Text(preset == .custom ? preset.rawValue : "\(preset.rawValue) — \(preset.detail)")
+					.tag(preset)
+			}
+		}
+		.frame(maxWidth: 330)
+	}
+
+	private var outputSummary: some View {
+		let dimensions = displayedOutputDimensions
+		return Text("\(dimensions.width) × \(dimensions.height) • \(job.outputFormat == .mp4 ? "H.264" : "GIF")")
+			.font(.caption)
+			.foregroundStyle(.secondary)
+	}
+
+	private var widthBinding: Binding<Int> {
+		.init(
+			get: { job.outputWidth },
+			set: {
+				let value = max(2, $0)
+				job.outputWidth = value
+				customWidth = value
+				job.socialVideoPreset = .custom
+			}
+		)
+	}
+
+	private var heightBinding: Binding<Int> {
+		.init(
+			get: { job.outputHeight },
+			set: {
+				let value = max(2, $0)
+				job.outputHeight = value
+				customHeight = value
+				job.socialVideoPreset = .custom
+			}
+		)
+	}
+
+	private var displayedOutputDimensions: (width: Int, height: Int) {
+		job.outputFormat == .mp4 ? job.effectiveMP4Dimensions : (job.outputWidth, job.outputHeight)
 	}
 
 	private var frameList: some View {
@@ -178,10 +280,10 @@ struct ImageSequenceScreen: View {
 			HStack {
 				Text("Frames")
 					.font(.headline)
-				Spacer()
-				Text("\(job.outputWidth) × \(job.outputHeight) px")
+				Text("Drag rows to reorder")
 					.font(.caption)
 					.foregroundStyle(.secondary)
+				Spacer()
 				Button("Add", systemImage: "plus") {
 					isAddingImages = true
 				}
@@ -194,7 +296,7 @@ struct ImageSequenceScreen: View {
 							Image(nsImage: image)
 								.resizable()
 								.scaledToFill()
-								.frame(width: 44, height: 32)
+								.frame(width: 42, height: 30)
 								.clipped()
 								.clipShape(.rect(cornerRadius: 4))
 						}
@@ -202,57 +304,55 @@ struct ImageSequenceScreen: View {
 						Text(url.lastPathComponent)
 							.lineLimit(1)
 						Spacer()
-
-						Button {
-							moveFrame(at: index, by: -1)
-						} label: {
-							Image(systemName: "chevron.up")
-						}
-						.disabled(index == 0)
-
-						Button {
-							moveFrame(at: index, by: 1)
-						} label: {
-							Image(systemName: "chevron.down")
-						}
-						.disabled(index == job.urls.count - 1)
-
+						Text("\(index + 1)")
+							.font(.caption)
+							.foregroundStyle(.tertiary)
+							.monospacedDigit()
 						Button(role: .destructive) {
 							removeFrame(at: index)
 						} label: {
 							Image(systemName: "trash")
 						}
+						.buttonStyle(.borderless)
 						.disabled(job.urls.count <= 2)
 					}
 				}
+				.onMove(perform: moveFrames)
 			}
 			.frame(maxHeight: .infinity)
 		}
 	}
 
 	private var bottomBar: some View {
-		HStack {
+		HStack(spacing: 12) {
 			Button("Add Images", systemImage: "plus") {
 				isAddingImages = true
 			}
 
 			Spacer()
 
-			Text("\(job.urls.count) frames • \(sequenceDuration.formatted(.number.precision(.fractionLength(2)))) s")
+			Text("\(job.urls.count) frames • \(job.duration.formatted(.number.precision(.fractionLength(2)))) s")
 				.font(.caption)
 				.foregroundStyle(.secondary)
 
 			Button(createButtonTitle, systemImage: "sparkles") {
-				guard job.outputWidth > 0, job.outputHeight > 0 else {
+				guard job.outputWidth >= 2, job.outputHeight >= 2 else {
 					appState.error = ImageSequenceError.invalidDimensions
 					return
 				}
 
-				switch job.outputFormat {
+				var exportJob = job
+				if exportJob.outputFormat == .mp4 {
+					let dimensions = exportJob.effectiveMP4Dimensions
+					exportJob.outputWidth = dimensions.width
+					exportJob.outputHeight = dimensions.height
+				}
+
+				switch exportJob.outputFormat {
 				case .gif:
-					appState.navigationPath.append(.imageSequenceConversion(job))
+					appState.navigationPath.append(.imageSequenceConversion(exportJob))
 				case .mp4:
-					appState.navigationPath.append(.imageSequenceVideoConversion(job))
+					appState.navigationPath.append(.imageSequenceVideoConversion(exportJob))
 				}
 			}
 			.buttonStyle(.borderedProminent)
@@ -264,44 +364,60 @@ struct ImageSequenceScreen: View {
 		job.outputFormat == .gif ? "Create GIF" : "Create MP4"
 	}
 
-	private var sequenceDuration: Double {
-		let frameCount = job.bounce ? (job.urls.count * 2 - 1) : job.urls.count
-		return Double(frameCount) / Double(max(job.frameRate, 1))
-	}
-
 	private func applySocialPreset() {
-		guard let dimensions = job.socialVideoPreset.dimensions else {
+		guard job.outputFormat == .mp4 else {
 			return
 		}
+
+		guard let dimensions = job.socialVideoPreset.dimensions else {
+			job.outputWidth = customWidth
+			job.outputHeight = customHeight
+			return
+		}
+
 		job.outputWidth = dimensions.width
 		job.outputHeight = dimensions.height
 	}
 
-	private func addImages(_ urls: [URL]) {
-		let imageURLs = urls.filter(ImageSequenceLoader.isImage)
-		guard !imageURLs.isEmpty else {
-			return
+	private func applyOutputFormat() {
+		previewPosition = 0
+		if job.outputFormat == .gif {
+			job.outputWidth = customWidth
+			job.outputHeight = customHeight
+		} else {
+			applySocialPreset()
 		}
-
-		for url in imageURLs {
-			_ = url.startAccessingSecurityScopedResource()
-		}
-
-		job.urls.append(contentsOf: imageURLs)
-		job.urls = Array(Set(job.urls)).sorted {
-			$0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending
-		}
-		previewIndex = min(previewIndex, max(0, job.urls.count - 1))
 	}
 
-	private func moveFrame(at index: Int, by offset: Int) {
-		let newIndex = index + offset
-		guard job.urls.indices.contains(index), job.urls.indices.contains(newIndex) else {
+	private func addImages(_ urls: [URL]) {
+		let sortedCandidates = urls
+			.filter(ImageSequenceLoader.isImage)
+			.sorted {
+				$0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending
+			}
+
+		var seen = Set(job.urls.map(\.standardizedFileURL))
+		var additions = [URL]()
+		for url in sortedCandidates {
+			let key = url.standardizedFileURL
+			guard seen.insert(key).inserted else {
+				continue
+			}
+			_ = url.startAccessingSecurityScopedResource()
+			additions.append(url)
+		}
+
+		guard !additions.isEmpty else {
 			return
 		}
 
-		job.urls.swapAt(index, newIndex)
-		previewIndex = newIndex
+		job.urls.append(contentsOf: additions)
+		previewPosition = min(previewPosition, max(0, job.frameIndices.count - 1))
+	}
+
+	private func moveFrames(from offsets: IndexSet, to destination: Int) {
+		job.urls.move(fromOffsets: offsets, toOffset: destination)
+		previewPosition = 0
 	}
 
 	private func removeFrame(at index: Int) {
@@ -309,8 +425,9 @@ struct ImageSequenceScreen: View {
 			return
 		}
 
-		job.urls.remove(at: index)
-		previewIndex = min(previewIndex, job.urls.count - 1)
+		let removedURL = job.urls.remove(at: index)
+		removedURL.stopAccessingSecurityScopedResource()
+		previewPosition = 0
 	}
 }
 
@@ -357,8 +474,7 @@ struct ImageSequenceConversionScreen: View {
 
 		try Task.checkCancellation()
 
-		let filename = job.displayName
-		let url = try data.writeToUniqueTemporaryFile(filename: filename, contentType: .gif)
+		let url = try data.writeToUniqueTemporaryFile(filename: job.displayName, contentType: .gif)
 		try? url.setAppAsItemCreator()
 
 		var path = appState.navigationPath
