@@ -21,6 +21,10 @@ struct MainScreen: View {
 						ImageSequenceScreen(job: job)
 					case .imageSequenceConversion(let job):
 						ImageSequenceConversionScreen(job: job)
+					case .imageSequenceVideoConversion(let job):
+						ImageSequenceVideoConversionScreen(job: job)
+					case .sequenceVideoCompleted(let url, let sourceURL):
+						SequenceVideoCompletedScreen(url: url, sourceURL: sourceURL)
 					case .completed(let data, let url, let sourceURL):
 						CompletedScreen(data: data, url: url, sourceURL: sourceURL)
 					}
@@ -39,7 +43,7 @@ struct MainScreen: View {
 			}
 		}
 		.fileDialogCustomizationID("import")
-		.fileDialogMessage("Choose a video or two or more still images to convert to an animated GIF")
+		.fileDialogMessage("Choose a video or two or more still images to create a GIF or MP4")
 		.fileDialogDefaultDirectory(.downloadsDirectory)
 //		.backgroundWithMaterial(.underWindowBackground, blendingMode: .behindWindow)
 		.alert(error: $appState.error)
