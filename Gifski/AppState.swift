@@ -67,29 +67,29 @@ final class AppState {
 	var navigationPath = [Route]()
 	var isFileImporterPresented = false
 	var isOpeningVideo = false
-	private var imageSequenceSecurityScopedURLs = Set<URL>()
+	private var imageSequenceSecurityScopedURLs = [URL: URL]()
 
 	func beginImageSequenceSecurityScopedAccess(_ url: URL) {
 		let key = url.standardizedFileURL
-		guard !imageSequenceSecurityScopedURLs.contains(key) else {
+		guard imageSequenceSecurityScopedURLs[key] == nil else {
 			return
 		}
 
 		if url.startAccessingSecurityScopedResource() {
-			imageSequenceSecurityScopedURLs.insert(key)
+			imageSequenceSecurityScopedURLs[key] = url
 		}
 	}
 
 	func endImageSequenceSecurityScopedAccess(_ url: URL) {
 		let key = url.standardizedFileURL
-		guard imageSequenceSecurityScopedURLs.remove(key) != nil else {
+		guard let originalURL = imageSequenceSecurityScopedURLs.removeValue(forKey: key) else {
 			return
 		}
-		url.stopAccessingSecurityScopedResource()
+		originalURL.stopAccessingSecurityScopedResource()
 	}
 
 	func releaseImageSequenceSecurityScopedAccess() {
-		for url in imageSequenceSecurityScopedURLs {
+		for url in imageSequenceSecurityScopedURLs.values {
 			url.stopAccessingSecurityScopedResource()
 		}
 		imageSequenceSecurityScopedURLs.removeAll()
