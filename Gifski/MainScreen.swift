@@ -57,14 +57,15 @@ struct MainScreen: View {
 				isTargeted: $isDropTargeted.animation(.easeInOut(duration: 0.2)),
 				onValidate: {
 					// Do not check movie type here. During hover, synchronous pasteboard type checks can fail for valid movie files, which prevents the drop highlight from appearing.
-					$0.hasFileURLs || $0.firstMovieFilePromiseReceiver != nil
+					$0.hasFileURLs || !$0.filePromiseReceivers.isEmpty
 				},
 				onPerform: {
 					/*
 					The macOS screen-recording thumbnail (`screencaptureui`) vends its recording as a file promise. Claim it directly: the source writes the file into a directory we own before it deletes its own temporary file. The plain `file://` path below races with that teardown, so the open would silently fail and the recording would be lost.
 					*/
-					if let promiseReceiver = $0.firstMovieFilePromiseReceiver {
-						appState.start(promiseReceiver)
+					let promiseReceivers = $0.filePromiseReceivers
+					if !promiseReceivers.isEmpty {
+						appState.start(promiseReceivers)
 						return true
 					}
 
