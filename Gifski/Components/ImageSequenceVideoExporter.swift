@@ -34,11 +34,23 @@ actor ImageSequenceVideoExporter {
 			throw ImageSequenceError.notEnoughImages
 		}
 
-		let width = max(2, job.outputWidth - (job.outputWidth % 2))
-		let height = max(2, job.outputHeight - (job.outputHeight % 2))
+		let dimensions = job.effectiveMP4Dimensions
+		guard dimensions.width >= 2, dimensions.height >= 2 else {
+			throw ImageSequenceError.invalidDimensions
+		}
+
+		let width = dimensions.width
+		let height = dimensions.height
 		let fps = job.frameRate.clamped(to: 3...50)
 		let outputURL = URL.temporaryDirectory.appending(path: "\(UUID().uuidString).mp4")
 		try? outputURL.delete()
+
+		var didFinishSuccessfully = false
+		defer {
+			if !didFinishSuccessfully {
+				try? outputURL.delete()
+			}
+		}
 
 		let writer = try AVAssetWriter(outputURL: outputURL, fileType: .mp4)
 		let bitrate = recommendedBitrate(width: width, height: height, frameRate: fps)
@@ -46,6 +58,11 @@ actor ImageSequenceVideoExporter {
 			AVVideoCodecKey: AVVideoCodecType.h264,
 			AVVideoWidthKey: width,
 			AVVideoHeightKey: height,
+			AVVideoColorPropertiesKey: [
+				AVVideoColorPrimariesKey: AVVideoColorPrimaries_ITU_R_709_2,
+				AVVideoTransferFunctionKey: AVVideoTransferFunction_ITU_R_709_2,
+				AVVideoYCbCrMatrixKey: AVVideoYCbCrMatrix_ITU_R_709_2
+			],
 			AVVideoCompressionPropertiesKey: [
 				AVVideoAverageBitRateKey: bitrate,
 				AVVideoMaxKeyFrameIntervalKey: fps * 2,
@@ -75,25 +92,21 @@ actor ImageSequenceVideoExporter {
 
 		writer.add(input)
 		guard writer.startWriting() else {
-			throw ImageSequenceVideoExporterError.exportFailed(writer.error?.localizedDescription ?? "Unknown error")
+			throw writerError(writer)
 		}
 		writer.startSession(atSourceTime: .zero)
 
-		let indices: [Int] = {
-			let forward = Array(job.urls.indices)
-			guard job.bounce, job.urls.count > 1 else {
-				return forward
-			}
-			return forward + Array((0..<(job.urls.count - 1)).reversed())
-		}()
-
+		let indices = job.frameIndices
 		for (outputIndex, sourceIndex) in indices.enumerated() {
 			try Task.checkCancellation()
 
 			while !input.isReadyForMoreMediaData {
 				try Task.checkCancellation()
+				try throwIfWriterStopped(writer)
 				try await Task.sleep(for: .milliseconds(5))
 			}
+
+			try throwIfWriterStopped(writer)
 
 			let source = try ImageSequenceLoader.loadCGImage(job.urls[sourceIndex])
 			let normalized = try ImageSequenceLoader.normalizedImage(source, width: width, height: height)
@@ -101,30 +114,42 @@ actor ImageSequenceVideoExporter {
 			let time = CMTime(value: CMTimeValue(outputIndex), timescale: CMTimeScale(fps))
 
 			guard adaptor.append(pixelBuffer, withPresentationTime: time) else {
-				throw ImageSequenceVideoExporterError.appendFailed
+				throw writer.error.map { ImageSequenceVideoExporterError.exportFailed($0.localizedDescription) }
+					?? ImageSequenceVideoExporterError.appendFailed
 			}
 
 			onProgress(Double(outputIndex + 1) / Double(indices.count))
 		}
 
+		// Give the last still a full frame duration instead of ending the movie at its presentation timestamp.
+		writer.endSession(atSourceTime: CMTime(value: CMTimeValue(indices.count), timescale: CMTimeScale(fps)))
 		input.markAsFinished()
 		await writer.finishWriting()
 
 		guard writer.status == .completed else {
-			throw ImageSequenceVideoExporterError.exportFailed(writer.error?.localizedDescription ?? "Unknown error")
+			throw writerError(writer)
 		}
 
+		didFinishSuccessfully = true
 		return outputURL
 	}
 
+	private static func throwIfWriterStopped(_ writer: AVAssetWriter) throws {
+		switch writer.status {
+		case .failed, .cancelled:
+			throw writerError(writer)
+		default:
+			break
+		}
+	}
+
+	private static func writerError(_ writer: AVAssetWriter) -> ImageSequenceVideoExporterError {
+		.exportFailed(writer.error?.localizedDescription ?? "The encoder stopped unexpectedly.")
+	}
+
 	private static func recommendedBitrate(width: Int, height: Int, frameRate: Int) -> Int {
-		let pixels = Double(width * height)
-		let fpsFactor = Double(frameRate) / 30.0
-		let bitsPerPixelPerFrame = 0.10
-		let calculated = Int(pixels * Double(frameRate) * bitsPerPixelPerFrame)
-		let floor = Int(4_000_000 * max(1, fpsFactor))
-		let ceiling = 20_000_000
-		return calculated.clamped(to: floor...ceiling)
+		let calculated = Int(Double(width * height * frameRate) * 0.08)
+		return calculated.clamped(to: 2_000_000...12_000_000)
 	}
 
 	private static func makePixelBuffer(from image: CGImage, width: Int, height: Int) throws -> CVPixelBuffer {
@@ -163,6 +188,7 @@ actor ImageSequenceVideoExporter {
 			throw ImageSequenceVideoExporterError.cannotCreatePixelBuffer
 		}
 
+		// H.264 has no alpha channel, so transparent source padding becomes white rather than black.
 		context.setFillColor(CGColor(gray: 1, alpha: 1))
 		context.fill(CGRect(x: 0, y: 0, width: width, height: height))
 		context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
