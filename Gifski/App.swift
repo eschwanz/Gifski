@@ -14,7 +14,7 @@ struct AppMain: App {
 			MainScreen()
 				.environment(appState)
 		}
-		.windowResizability(.contentSize)
+		.windowResizability(.contentMinSize)
 		.windowToolbarStyle(.unifiedCompact)
 //		.windowBackgroundDragBehavior(.enabled) // Does not work. (macOS 15.2)
 		.defaultPosition(.center)
