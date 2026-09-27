@@ -24,6 +24,8 @@ enum Route: Hashable {
 	case conversion(GIFGenerator.Conversion)
 	case imageSequence(ImageSequenceJob)
 	case imageSequenceConversion(ImageSequenceJob)
+	case imageSequenceVideoConversion(ImageSequenceJob)
+	case sequenceVideoCompleted(URL, sourceURL: URL)
 	case completed(Data, URL, sourceURL: URL)
 }
 
