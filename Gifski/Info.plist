@@ -25,6 +25,18 @@
 				<string>public.mpeg-4</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>Image Sequence</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>public.image</string>
+			</array>
+		</dict>
 	</array>
 	<key>CFBundleURLTypes</key>
 	<array>
@@ -47,7 +59,7 @@
 			<key>NSMenuItem</key>
 			<dict>
 				<key>default</key>
-				<string>Convert to GIF with Gifski</string>
+				<string>Create GIF with Gif&apos;in Stills</string>
 			</dict>
 			<key>NSMessage</key>
 			<string>convertToGIF</string>
