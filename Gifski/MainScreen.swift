@@ -30,7 +30,7 @@ struct MainScreen: View {
 					}
 				}
 		}
-		.frame(width: 760, height: 640)
+		.frame(minWidth: 700, idealWidth: 860, minHeight: 600, idealHeight: 700)
 		.fileImporter(
 			isPresented: $appState.isFileImporterPresented,
 			allowedContentTypes: Device.supportedVideoTypes + [.image],
@@ -102,7 +102,6 @@ struct MainScreen: View {
 		// `.materialActiveAppearance` does not currently work here. Remove `.windowIsVibrant` when it does.
 //		.containerBackground(.thinMaterial.materialActiveAppearance(.active), for: .window)
 		.toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
-		.windowResizeBehavior(.disabled)
 		.windowTabbingMode(.disallowed)
 		.windowCollectionBehavior(.fullScreenNone)
 		.windowIsMovableByWindowBackground()
