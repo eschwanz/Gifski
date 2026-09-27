@@ -67,6 +67,33 @@ final class AppState {
 	var navigationPath = [Route]()
 	var isFileImporterPresented = false
 	var isOpeningVideo = false
+	private var imageSequenceSecurityScopedURLs = Set<URL>()
+
+	func beginImageSequenceSecurityScopedAccess(_ url: URL) {
+		let key = url.standardizedFileURL
+		guard !imageSequenceSecurityScopedURLs.contains(key) else {
+			return
+		}
+
+		if url.startAccessingSecurityScopedResource() {
+			imageSequenceSecurityScopedURLs.insert(key)
+		}
+	}
+
+	func endImageSequenceSecurityScopedAccess(_ url: URL) {
+		let key = url.standardizedFileURL
+		guard imageSequenceSecurityScopedURLs.remove(key) != nil else {
+			return
+		}
+		url.stopAccessingSecurityScopedResource()
+	}
+
+	func releaseImageSequenceSecurityScopedAccess() {
+		for url in imageSequenceSecurityScopedURLs {
+			url.stopAccessingSecurityScopedResource()
+		}
+		imageSequenceSecurityScopedURLs.removeAll()
+	}
 
 	enum Mode {
 		case normal
@@ -143,19 +170,6 @@ final class AppState {
 		// We have to include `.badge` otherwise system settings does not show the checkbox to turn off sounds. (macOS 12.4)
 		UNUserNotificationCenter.current().requestAuthorization(options: [.sound, .badge]) { _, _ in }
 
-		delay(.seconds(1)) {
-			SSApp.runOnce(identifier: "firstLaunch-3-0-0") {
-				guard !SSApp.isFirstLaunch else {
-					return
-				}
-
-				NSAlert.showModal(
-					for: NSApp.mainWindow,
-					title: "Welcome to Gifski 3",
-					message: "Gifski now supports cropping and preview.\n\nNote: Quick Look is no longer available after conversion. It was unreliable, and the preview window is now large enough on its own.\n\nKnown issue: Dragging from a Dock folder into the window may fail due to a macOS bug."
-				)
-			}
-		}
 	}
 
 	func start(_ url: URL) {
@@ -171,6 +185,7 @@ final class AppState {
 	}
 
 	private func startOpeningVideo(_ url: URL) {
+		releaseImageSequenceSecurityScopedAccess()
 		// We intentionally do not call `stop` on this one later for simplicity since we will never get a lot of files.
 		let didStartSecurityScopedAccess = url.startAccessingSecurityScopedResource()
 		let contentType = url.contentType?.identifier ?? "unknown"
