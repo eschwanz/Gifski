@@ -7,6 +7,13 @@ import UniformTypeIdentifiers
 
 struct ImageSequenceTests {
 	@Test
+	func splashArtworkDecodes() throws {
+		let image = try #require(SplashImageData.image)
+		#expect(image.size.width >= 1000)
+		#expect(image.size.height >= 500)
+	}
+
+	@Test
 	func bounceFrameOrder() {
 		let urls = (0..<4).map { URL(filePath: "/tmp/frame\($0).png") }
 		let job = ImageSequenceJob(
