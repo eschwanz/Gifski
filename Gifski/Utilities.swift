@@ -1738,7 +1738,7 @@ extension SSApp {
 	*/
 	static func appFeedbackUrl() -> URL {
 		URL("https://github.com/eschwanz/Gifski/issues")
-
+	}
 }
 
 extension SSApp {
