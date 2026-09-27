@@ -1,7 +1,9 @@
 import AVFoundation
 import CoreGraphics
+import CoreTransferable
 import CoreVideo
 import Foundation
+import UniformTypeIdentifiers
 
 enum ImageSequenceVideoExporterError: LocalizedError {
 	case cannotCreateWriter
