@@ -4,7 +4,7 @@
 <dict>
 	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>group.com.sindresorhus.Gifski</string>
+		<string>group.com.gifinstills.GifInStills</string>
 	</array>
 </dict>
 </plist>
