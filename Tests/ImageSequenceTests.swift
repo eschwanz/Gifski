@@ -29,15 +29,15 @@ struct ImageSequenceTests {
 		#expect(result.height == 100)
 
 		let data = try #require(result.dataProvider?.data)
-		let bytes = CFDataGetBytePtr(data)
+		let bytes = try #require(CFDataGetBytePtr(data))
 		let rowBytes = result.bytesPerRow
 
 		// The top-left pixel is outside the aspect-fit image and should remain transparent.
-		#expect(bytes?[3] == 0)
+		#expect(bytes[3] == 0)
 
 		// The center pixel is inside the source image and should be opaque.
 		let centerOffset = (50 * rowBytes) + (50 * 4)
-		#expect(bytes?[centerOffset + 3] == 255)
+		#expect(bytes[centerOffset + 3] == 255)
 	}
 
 	@Test
