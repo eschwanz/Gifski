@@ -403,7 +403,7 @@ struct ImageSequenceScreen: View {
 			guard seen.insert(key).inserted else {
 				continue
 			}
-			_ = url.startAccessingSecurityScopedResource()
+			appState.beginImageSequenceSecurityScopedAccess(url)
 			additions.append(url)
 		}
 
@@ -426,7 +426,7 @@ struct ImageSequenceScreen: View {
 		}
 
 		let removedURL = job.urls.remove(at: index)
-		removedURL.stopAccessingSecurityScopedResource()
+		appState.endImageSequenceSecurityScopedAccess(removedURL)
 		previewPosition = 0
 	}
 }
