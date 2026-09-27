@@ -1,4 +1,4 @@
-name: Build Image Sequence DMG
+name: Build Gif'in Stills DMG
 
 on:
   push:
@@ -27,6 +27,22 @@ jobs:
       - name: Resolve packages
         run: xcodebuild -resolvePackageDependencies -project Gifski.xcodeproj -scheme Gifski
 
+      - name: Test image sequence exports
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project Gifski.xcodeproj \
+            -scheme Gifski \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -derivedDataPath "$RUNNER_TEMP/TestDerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM="" \
+            -only-testing:GifskiTests/ImageSequenceTests \
+            test | tee "$RUNNER_TEMP/xcodebuild-tests.log"
+
       - name: Build app
         run: |
           set -o pipefail
@@ -54,26 +70,28 @@ jobs:
       - name: Package DMG
         run: |
           mkdir -p "$RUNNER_TEMP/dmg"
-          cp -R "${{ steps.app.outputs.path }}" "$RUNNER_TEMP/dmg/Gifski.app"
+          cp -R "${{ steps.app.outputs.path }}" "$RUNNER_TEMP/dmg/Gif'in Stills.app"
           ln -s /Applications "$RUNNER_TEMP/dmg/Applications"
           hdiutil create \
-            -volname "Gifski Image Sequences" \
+            -volname "Gif'in Stills" \
             -srcfolder "$RUNNER_TEMP/dmg" \
             -ov \
             -format UDZO \
-            "$RUNNER_TEMP/Gifski-Image-Sequences.dmg"
+            "$RUNNER_TEMP/GifIn-Stills.dmg"
 
       - name: Upload DMG
         uses: actions/upload-artifact@v4
         with:
-          name: Gifski-Image-Sequences-DMG
-          path: ${{ runner.temp }}/Gifski-Image-Sequences.dmg
+          name: GifIn-Stills-DMG
+          path: ${{ runner.temp }}/GifIn-Stills.dmg
           if-no-files-found: error
 
-      - name: Upload build log on failure
+      - name: Upload build logs on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: xcodebuild-log
-          path: ${{ runner.temp }}/xcodebuild.log
+          name: xcodebuild-logs
+          path: |
+            ${{ runner.temp }}/xcodebuild.log
+            ${{ runner.temp }}/xcodebuild-tests.log
           if-no-files-found: ignore
