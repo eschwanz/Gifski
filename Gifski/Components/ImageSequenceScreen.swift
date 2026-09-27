@@ -11,6 +11,8 @@ struct ImageSequenceScreen: View {
 	@State private var isDropTargeted = false
 	@State private var customWidth: Int
 	@State private var customHeight: Int
+	@State private var estimatedGIFBytes: Int?
+	@State private var isEstimatingGIFSize = false
 
 	init(job: ImageSequenceJob) {
 		self._job = .init(initialValue: job)
@@ -60,6 +62,9 @@ struct ImageSequenceScreen: View {
 			}
 			return true
 		}
+		.task(id: gifEstimateTaskID) {
+			await updateGIFSizeEstimate()
+		}
 		.task(id: previewTaskID) {
 			while !Task.isCancelled {
 				let nanoseconds = UInt64((1_000_000_000 / Double(max(job.frameRate, 1))).rounded())
@@ -78,6 +83,19 @@ struct ImageSequenceScreen: View {
 		.onChange(of: job.outputFormat) {
 			applyOutputFormat()
 		}
+	}
+
+	private var gifEstimateTaskID: String {
+		[
+			job.outputFormat.rawValue,
+			String(job.frameRate),
+			String(job.quality),
+			String(job.loop),
+			String(job.bounce),
+			String(job.outputWidth),
+			String(job.outputHeight),
+			job.urls.map(\.path).joined(separator: "|")
+		].joined(separator: ":")
 	}
 
 	private var previewTaskID: String {
@@ -242,9 +260,25 @@ struct ImageSequenceScreen: View {
 
 	private var outputSummary: some View {
 		let dimensions = displayedOutputDimensions
-		return Text("\(dimensions.width) × \(dimensions.height) • \(job.outputFormat == .mp4 ? "H.264" : "GIF")")
-			.font(.caption)
-			.foregroundStyle(.secondary)
+
+		return HStack(spacing: 6) {
+			Text("\(dimensions.width) × \(dimensions.height) • \(job.outputFormat == .mp4 ? "H.264" : "GIF")")
+
+			if job.outputFormat == .gif, job.urls.count >= 2 {
+				Text("•")
+
+				if isEstimatingGIFSize {
+					ProgressView()
+						.controlSize(.mini)
+					Text("Estimating size…")
+				} else if let estimatedGIFBytes {
+					Text("Estimated \(ByteCountFormatter.string(fromByteCount: Int64(estimatedGIFBytes), countStyle: .file))")
+						.fontWeight(.medium)
+				}
+			}
+		}
+		.font(.caption)
+		.foregroundStyle(.secondary)
 	}
 
 	private var widthBinding: Binding<Int> {
@@ -336,9 +370,22 @@ struct ImageSequenceScreen: View {
 					.font(.caption)
 					.foregroundStyle(.secondary)
 			} else {
-				Text("\(job.urls.count) frames • \(job.duration.formatted(.number.precision(.fractionLength(2)))) s")
-					.font(.caption)
-					.foregroundStyle(.secondary)
+				HStack(spacing: 6) {
+					Text("\(job.urls.count) frames • \(job.duration.formatted(.number.precision(.fractionLength(2)))) s")
+
+					if job.outputFormat == .gif {
+						Text("•")
+
+						if isEstimatingGIFSize {
+							Text("Estimating…")
+						} else if let estimatedGIFBytes {
+							Text("~\(ByteCountFormatter.string(fromByteCount: Int64(estimatedGIFBytes), countStyle: .file))")
+								.fontWeight(.medium)
+						}
+					}
+				}
+				.font(.caption)
+				.foregroundStyle(.secondary)
 			}
 
 			Button(createButtonTitle, systemImage: "sparkles") {
@@ -369,6 +416,36 @@ struct ImageSequenceScreen: View {
 
 	private var createButtonTitle: String {
 		job.outputFormat == .gif ? "Create GIF" : "Create MP4"
+	}
+
+	private func updateGIFSizeEstimate() async {
+		guard job.outputFormat == .gif, job.urls.count >= 2 else {
+			estimatedGIFBytes = nil
+			isEstimatingGIFSize = false
+			return
+		}
+
+		isEstimatingGIFSize = true
+		estimatedGIFBytes = nil
+
+		do {
+			try await Task.sleep(for: .milliseconds(450))
+			try Task.checkCancellation()
+
+			let estimateJob = job
+			let data = try await ImageSequenceGenerator.run(estimateJob) { _ in }
+			try Task.checkCancellation()
+
+			estimatedGIFBytes = data.count
+			isEstimatingGIFSize = false
+		} catch {
+			guard !error.isCancelled else {
+				return
+			}
+
+			estimatedGIFBytes = nil
+			isEstimatingGIFSize = false
+		}
 	}
 
 	private func applySocialPreset() {
