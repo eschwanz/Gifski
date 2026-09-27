@@ -57,7 +57,7 @@ final class AppState {
 
 	var isConverting: Bool {
 		switch navigationPath.last {
-		case .conversion, .imageSequenceConversion:
+		case .conversion, .imageSequenceConversion, .imageSequenceVideoConversion:
 			true
 		default:
 			false
@@ -374,7 +374,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 			let response = NSAlert.showModal(
 				for: SSApp.swiftUIMainWindow,
 				title: "Do you want to continue converting?",
-				message: "Gifski is currently converting a video. If you quit, the conversion will be cancelled.",
+				message: "Gif’in Stills is currently creating a file. If you quit, the export will be cancelled.",
 				buttonTitles: [
 					"Continue",
 					"Quit"
