@@ -53,23 +53,15 @@ struct AppMain: App {
 			}
 			CommandGroup(replacing: .help) {
 				Link(
-					"Website",
-					systemImage: "safari",
-					destination: "https://sindresorhus.com/gifski"
-				)
-				Link(
-					"Source Code",
+					"Gif’in Stills Source",
 					systemImage: "chevron.left.forwardslash.chevron.right",
 					destination: "https://github.com/eschwanz/Gifski"
 				)
 				Link(
-					"Gifski Library",
+					"Gifski Encoding Library",
 					systemImage: "shippingbox",
 					destination: "https://github.com/ImageOptim/gifski"
 				)
-				Divider()
-				RateOnAppStoreButton(appStoreID: "1351639930")
-				ShareAppButton(appStoreID: "1351639930")
 				Divider()
 				Button("Copy Logs", systemImage: "doc.on.clipboard") {
 					appState.copyDiagnosticLogs()
