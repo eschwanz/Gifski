@@ -331,9 +331,15 @@ struct ImageSequenceScreen: View {
 
 			Spacer()
 
-			Text("\(job.urls.count) frames • \(job.duration.formatted(.number.precision(.fractionLength(2)))) s")
-				.font(.caption)
-				.foregroundStyle(.secondary)
+			if job.urls.count < 2 {
+				Label("Add at least one more image", systemImage: "exclamationmark.triangle")
+					.font(.caption)
+					.foregroundStyle(.secondary)
+			} else {
+				Text("\(job.urls.count) frames • \(job.duration.formatted(.number.precision(.fractionLength(2)))) s")
+					.font(.caption)
+					.foregroundStyle(.secondary)
+			}
 
 			Button(createButtonTitle, systemImage: "sparkles") {
 				guard job.outputWidth >= 2, job.outputHeight >= 2 else {
@@ -356,6 +362,7 @@ struct ImageSequenceScreen: View {
 				}
 			}
 			.buttonStyle(.borderedProminent)
+			.disabled(job.urls.count < 2)
 			.keyboardShortcut(.return, modifiers: [.command])
 		}
 	}
