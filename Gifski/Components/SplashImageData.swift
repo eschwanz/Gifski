@@ -10,7 +10,8 @@ enum SplashImageData {
 		part04,
 		part05,
 		part06,
-		part07
+		part07,
+		part08
 	].joined()
 
 	static let image: NSImage? = {
