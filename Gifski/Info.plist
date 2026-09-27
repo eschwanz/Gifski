@@ -4,6 +4,8 @@
 <dict>
 	<key>CFBundleDisplayName</key>
 	<string>Gif&apos;in Stills</string>
+	<key>CFBundleName</key>
+	<string>Gif&apos;in Stills</string>
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>
