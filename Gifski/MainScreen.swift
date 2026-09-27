@@ -78,7 +78,7 @@ struct MainScreen: View {
 
 					`NSItemProvider.getURL()` goes through the sandbox broker (Powerbox), which vends a security-scoped URL and shows the macOS file-access permission prompt (e.g. for the Downloads/Desktop folder) when needed. Reading the URL directly from the drag pasteboard returns a plain `file://` URL that bypasses the broker, so the app is never granted access, the prompt never appears, and the open silently fails. We use the pasteboard read above only for synchronous movie-type validation, never to actually open the file.
 
-					Do not "simplify" this back to opening `firstMovieFileURL` directly. That regressed window drops in 3.0.x.
+					Do not open drag-pasteboard URLs directly. Use the item providers below so sandbox access is granted correctly.
 					*/
 					let itemProviders = $0.itemProviders(for: [.fileURL])
 					guard !itemProviders.isEmpty else {
