@@ -75,7 +75,7 @@ struct SequenceVideoCompletedScreen: View {
 			VStack(spacing: 3) {
 				Text("Final MP4 size: \(url.fileSizeFormatted)")
 					.font(.subheadline.weight(.medium))
-				Text(url.filename)
+				Text("\(sourceURL.filenameWithoutExtension)-animation.mp4")
 					.font(.caption)
 					.foregroundStyle(.secondary)
 			}
@@ -101,7 +101,7 @@ struct SequenceVideoCompletedScreen: View {
 		.fileExporter(
 			isPresented: $isFileExporterPresented,
 			item: ExportableMP4(url: url),
-			defaultFilename: "\(sourceURL.filenameWithoutExtension).mp4"
+			defaultFilename: "\(sourceURL.filenameWithoutExtension)-animation.mp4"
 		) { result in
 			do {
 				let savedURL = try result.get()
@@ -115,6 +115,7 @@ struct SequenceVideoCompletedScreen: View {
 		}
 		.onDisappear {
 			player.pause()
+			try? url.delete()
 		}
 	}
 }
