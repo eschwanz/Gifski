@@ -41,7 +41,7 @@ actor ImageSequenceVideoExporter {
 
 		let width = dimensions.width
 		let height = dimensions.height
-		let fps = job.frameRate.clamped(to: 3...50)
+		let fps = job.frameRate.clamped(to: Constants.allowedImageSequenceFrameRate)
 		let outputURL = URL.temporaryDirectory.appending(path: "\(UUID().uuidString).mp4")
 		try? outputURL.delete()
 
@@ -65,7 +65,7 @@ actor ImageSequenceVideoExporter {
 			],
 			AVVideoCompressionPropertiesKey: [
 				AVVideoAverageBitRateKey: bitrate,
-				AVVideoMaxKeyFrameIntervalKey: fps * 2,
+				AVVideoMaxKeyFrameIntervalKey: max(1, Int((fps * 2).rounded())),
 				AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel
 			]
 		]
@@ -111,7 +111,7 @@ actor ImageSequenceVideoExporter {
 			let source = try ImageSequenceLoader.loadCGImage(job.urls[sourceIndex])
 			let normalized = try ImageSequenceLoader.normalizedImage(source, width: width, height: height)
 			let pixelBuffer = try makePixelBuffer(from: normalized, width: width, height: height)
-			let time = CMTime(value: CMTimeValue(outputIndex), timescale: CMTimeScale(fps))
+			let time = CMTime(seconds: Double(outputIndex) / fps, preferredTimescale: 60_000)
 
 			guard adaptor.append(pixelBuffer, withPresentationTime: time) else {
 				throw writer.error.map { ImageSequenceVideoExporterError.exportFailed($0.localizedDescription) }
@@ -122,7 +122,7 @@ actor ImageSequenceVideoExporter {
 		}
 
 		// Give the last still a full frame duration instead of ending the movie at its presentation timestamp.
-		writer.endSession(atSourceTime: CMTime(value: CMTimeValue(indices.count), timescale: CMTimeScale(fps)))
+		writer.endSession(atSourceTime: CMTime(seconds: Double(indices.count) / fps, preferredTimescale: 60_000))
 		input.markAsFinished()
 		await writer.finishWriting()
 
@@ -147,7 +147,7 @@ actor ImageSequenceVideoExporter {
 		.exportFailed(writer.error?.localizedDescription ?? "The encoder stopped unexpectedly.")
 	}
 
-	private static func recommendedBitrate(width: Int, height: Int, frameRate: Int) -> Int {
+	private static func recommendedBitrate(width: Int, height: Int, frameRate: Double) -> Int {
 		let calculated = Int(Double(width * height * frameRate) * 0.08)
 		return calculated.clamped(to: 2_000_000...12_000_000)
 	}
