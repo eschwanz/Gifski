@@ -4,6 +4,9 @@ concurrency:
   group: gif-in-stills-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: write
+
 on:
   push:
     branches:
@@ -25,20 +28,61 @@ jobs:
           swift --version
           rustc --version || true
 
-      - name: Install SwiftLint
-        run: brew install swiftlint
+      - name: Install build tools
+        run: brew install swiftlint librsvg
 
-      - name: Validate splash artwork
+      - name: Migrate splash to raster asset
+        id: splash
+        shell: bash
         run: |
           set -euo pipefail
-          SPLASH="Gifski/Assets.xcassets/GifInStillsSplash.imageset/GifInStillsSplash.svg"
-          test -s "$SPLASH"
-          grep -q '<svg' "$SPLASH"
-          grep -q "Gif.in Stills" "$SPLASH"
+          IMAGESET="Gifski/Assets.xcassets/GifInStillsSplash.imageset"
+          SVG="$IMAGESET/GifInStillsSplash.svg"
+          PNG="$IMAGESET/GifInStillsSplash.png"
+
+          if [ -f "$SVG" ]; then
+            rsvg-convert -w 1600 -h 900 "$SVG" -o "$PNG"
+            cat > "$IMAGESET/Contents.json" <<'JSON'
+          {
+            "images": [
+              {
+                "filename": "GifInStillsSplash.png",
+                "idiom": "universal",
+                "scale": "1x"
+              }
+            ],
+            "info": {
+              "author": "xcode",
+              "version": 1
+            }
+          }
+          JSON
+            git rm "$SVG"
+            git add "$PNG" "$IMAGESET/Contents.json"
+            echo "migrated=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "migrated=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          test -s "$PNG"
+          WIDTH="$(sips -g pixelWidth "$PNG" | awk '/pixelWidth/ {print $2}')"
+          HEIGHT="$(sips -g pixelHeight "$PNG" | awk '/pixelHeight/ {print $2}')"
+          echo "Splash dimensions: ${WIDTH}x${HEIGHT}"
+          test "$WIDTH" -eq 1600
+          test "$HEIGHT" -eq 900
+
           if compgen -G "Gifski/Components/SplashImage*.swift" > /dev/null; then
             echo "Obsolete embedded splash source still exists."
             exit 1
           fi
+
+      - name: Commit raster splash asset
+        if: steps.splash.outputs.migrated == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Rasterize splash artwork for reliable macOS rendering"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
 
       - name: Resolve packages
         run: xcodebuild -resolvePackageDependencies -project Gifski.xcodeproj -scheme Gifski
