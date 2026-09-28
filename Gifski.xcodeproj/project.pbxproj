@@ -518,7 +518,7 @@
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Share Extension/Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = Gifski;
+				INFOPLIST_KEY_CFBundleDisplayName = "Gif'in Stills";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -526,7 +526,7 @@
 				);
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
-				PRODUCT_BUNDLE_IDENTIFIER = com.sindresorhus.Gifski.ShareExtension;
+				PRODUCT_BUNDLE_IDENTIFIER = com.gifinstills.GifInStills.ShareExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				REGISTER_APP_GROUPS = YES;
@@ -552,14 +552,14 @@
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Share Extension/Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = Gifski;
+				INFOPLIST_KEY_CFBundleDisplayName = "Gif'in Stills";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 					"@executable_path/../../../../Frameworks",
 				);
 				MTL_FAST_MATH = YES;
-				PRODUCT_BUNDLE_IDENTIFIER = com.sindresorhus.Gifski.ShareExtension;
+				PRODUCT_BUNDLE_IDENTIFIER = com.gifinstills.GifInStills.ShareExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				REGISTER_APP_GROUPS = YES;
@@ -582,7 +582,7 @@
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 26.2;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.sindresorhus.GifskiTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.gifinstills.GifInStillsTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
@@ -608,7 +608,7 @@
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 26.2;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.sindresorhus.GifskiTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.gifinstills.GifInStillsTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -778,7 +778,7 @@
 				);
 				LIBRARY_SEARCH_PATHS = "$(inherited)";
 				MTL_LANGUAGE_REVISION = Metal20;
-				PRODUCT_BUNDLE_IDENTIFIER = com.sindresorhus.Gifski;
+				PRODUCT_BUNDLE_IDENTIFIER = com.gifinstills.GifInStills;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				REGISTER_APP_GROUPS = YES;
@@ -819,7 +819,7 @@
 				);
 				LIBRARY_SEARCH_PATHS = "$(inherited)";
 				MTL_LANGUAGE_REVISION = Metal20;
-				PRODUCT_BUNDLE_IDENTIFIER = com.sindresorhus.Gifski;
+				PRODUCT_BUNDLE_IDENTIFIER = com.gifinstills.GifInStills;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				REGISTER_APP_GROUPS = YES;

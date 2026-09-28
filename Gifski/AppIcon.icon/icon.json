@@ -2,12 +2,8 @@
   "fill-specializations" : [
     {
       "value" : {
-        "solid" : "gray:0.20000,1.00000"
+        "solid" : "gray:0.96000,1.00000"
       }
-    },
-    {
-      "appearance" : "dark",
-      "value" : "system-dark"
     }
   ],
   "groups" : [
@@ -17,8 +13,11 @@
       "layers" : [
         {
           "blend-mode" : "normal",
-          "image-name" : "Rainbow.png",
-          "name" : "Rainbow",
+          "glass" : false,
+          "hidden" : false,
+          "image-name" : "GifInStillsIcon.svg",
+          "name" : "Gif'in Stills",
+          "opacity" : 1,
           "position" : {
             "scale" : 1,
             "translation-in-points" : [
@@ -29,38 +28,12 @@
         }
       ],
       "shadow" : {
-        "kind" : "layer-color",
-        "opacity" : 0.4
-      },
-      "translucency" : {
-        "enabled" : true,
-        "value" : 0.4
-      }
-    },
-    {
-      "layers" : [
-        {
-          "glass" : false,
-          "hidden" : false,
-          "image-name" : "Background.png",
-          "name" : "Background",
-          "opacity" : 0.4,
-          "position" : {
-            "scale" : 1.01,
-            "translation-in-points" : [
-              0,
-              0
-            ]
-          }
-        }
-      ],
-      "shadow" : {
         "kind" : "none",
-        "opacity" : 0.5
+        "opacity" : 0
       },
       "translucency" : {
-        "enabled" : true,
-        "value" : 0.5
+        "enabled" : false,
+        "value" : 0
       }
     }
   ],

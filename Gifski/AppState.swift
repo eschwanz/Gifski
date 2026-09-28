@@ -8,7 +8,7 @@ private final class ImportLog {
 	static let shared = ImportLog()
 
 	private let logger = Logger(
-		subsystem: Bundle.main.bundleIdentifier ?? "com.sindresorhus.Gifski",
+		subsystem: Bundle.main.bundleIdentifier ?? "com.gifinstills.GifInStills",
 		category: "Import"
 	)
 
@@ -56,16 +56,44 @@ final class AppState {
 	}
 
 	var isConverting: Bool {
-		guard case .conversion = navigationPath.last else {
-			return false
+		switch navigationPath.last {
+		case .conversion, .imageSequenceConversion, .imageSequenceVideoConversion:
+			true
+		default:
+			false
 		}
-
-		return true
 	}
 
 	var navigationPath = [Route]()
 	var isFileImporterPresented = false
 	var isOpeningVideo = false
+	private var imageSequenceSecurityScopedURLs = [URL: URL]()
+
+	func beginImageSequenceSecurityScopedAccess(_ url: URL) {
+		let key = url.standardizedFileURL
+		guard imageSequenceSecurityScopedURLs[key] == nil else {
+			return
+		}
+
+		if url.startAccessingSecurityScopedResource() {
+			imageSequenceSecurityScopedURLs[key] = url
+		}
+	}
+
+	func endImageSequenceSecurityScopedAccess(_ url: URL) {
+		let key = url.standardizedFileURL
+		guard let originalURL = imageSequenceSecurityScopedURLs.removeValue(forKey: key) else {
+			return
+		}
+		originalURL.stopAccessingSecurityScopedResource()
+	}
+
+	func releaseImageSequenceSecurityScopedAccess() {
+		for url in imageSequenceSecurityScopedURLs.values {
+			url.stopAccessingSecurityScopedResource()
+		}
+		imageSequenceSecurityScopedURLs.removeAll()
+	}
 
 	enum Mode {
 		case normal
@@ -142,19 +170,6 @@ final class AppState {
 		// We have to include `.badge` otherwise system settings does not show the checkbox to turn off sounds. (macOS 12.4)
 		UNUserNotificationCenter.current().requestAuthorization(options: [.sound, .badge]) { _, _ in }
 
-		delay(.seconds(1)) {
-			SSApp.runOnce(identifier: "firstLaunch-3-0-0") {
-				guard !SSApp.isFirstLaunch else {
-					return
-				}
-
-				NSAlert.showModal(
-					for: NSApp.mainWindow,
-					title: "Welcome to Gifski 3",
-					message: "Gifski now supports cropping and preview.\n\nNote: Quick Look is no longer available after conversion. It was unreliable, and the preview window is now large enough on its own.\n\nKnown issue: Dragging from a Dock folder into the window may fail due to a macOS bug."
-				)
-			}
-		}
 	}
 
 	func start(_ url: URL) {
@@ -170,6 +185,7 @@ final class AppState {
 	}
 
 	private func startOpeningVideo(_ url: URL) {
+		releaseImageSequenceSecurityScopedAccess()
 		// We intentionally do not call `stop` on this one later for simplicity since we will never get a lot of files.
 		let didStartSecurityScopedAccess = url.startAccessingSecurityScopedResource()
 		let contentType = url.contentType?.identifier ?? "unknown"
@@ -254,6 +270,35 @@ final class AppState {
 
 	The promise source writes the file into a directory we own before it tears down its own temporary file, so the video remains available. This avoids the race in the plain drag-pasteboard path where the source deletes its temporary file before the async open resolves, losing the recording.
 	*/
+	func start(_ promiseReceivers: [NSFilePromiseReceiver]) {
+		guard !isOpeningVideo else {
+			return
+		}
+
+		guard !promiseReceivers.isEmpty else {
+			return
+		}
+
+		isOpeningVideo = true
+
+		Task { [self] in
+			do {
+				var urls = [URL]()
+				for receiver in promiseReceivers {
+					for try await url in try receiver.receivePromisedFile() {
+						urls.append(url)
+						break
+					}
+				}
+
+				isOpeningVideo = false
+				start(urls)
+			} catch {
+				handlePromisedVideoError(error)
+			}
+		}
+	}
+
 	func start(_ promiseReceiver: NSFilePromiseReceiver) {
 		guard !isOpeningVideo else {
 			ImportLog.shared.info(
@@ -348,34 +393,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 			return
 		}
 
-		guard
-			urls.count == 1,
-			let videoUrl = urls.first
-		else {
-			ImportLog.shared.error(
-				"Rejected open URLs event because it contained \(urls.count) files",
-				"Rejected open URLs event because it contained \(urls.count) files"
-			)
-			NSAlert.showModal(
-				for: SSApp.swiftUIMainWindow,
-				title: "Gifski can only convert a single file at a time."
-			)
-
+		guard !urls.isEmpty else {
 			return
 		}
 
-		guard let videoUrl2 = AppState.shared.extractSharedVideoUrlIfAny(from: videoUrl) else {
-			ImportLog.shared.error("Rejected open URLs event because no usable video URL could be resolved", "Rejected open URLs event because no usable video URL could be resolved")
+		if urls.count == 1, let url = urls.first, !ImageSequenceLoader.isImage(url) {
+			guard let videoURL = AppState.shared.extractSharedVideoUrlIfAny(from: url) else {
+				return
+		}
+
+			LaunchCompletions.add {
+				AppState.shared.start(videoURL)
+			}
 			return
 		}
 
-		// Start video conversion on launch
 		LaunchCompletions.add {
-			ImportLog.shared.info(
-				"Running queued open video completion: pathExtension=\(videoUrl2.pathExtension)",
-				"Running queued open video completion: filename=\(videoUrl2.lastPathComponent), pathExtension=\(videoUrl2.pathExtension)"
-			)
-			AppState.shared.start(videoUrl2)
+			AppState.shared.start(urls)
 		}
 	}
 
@@ -384,7 +418,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 			let response = NSAlert.showModal(
 				for: SSApp.swiftUIMainWindow,
 				title: "Do you want to continue converting?",
-				message: "Gifski is currently converting a video. If you quit, the conversion will be cancelled.",
+				message: "Gif’in Stills is currently creating a file. If you quit, the export will be cancelled.",
 				buttonTitles: [
 					"Continue",
 					"Quit"
