@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="plane1" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff6f73"/>
+      <stop offset="1" stop-color="#f69a78"/>
+    </linearGradient>
+    <linearGradient id="plane2" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff3e87"/>
+      <stop offset="1" stop-color="#ff896f"/>
+    </linearGradient>
+    <linearGradient id="ribbon" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ffc312"/>
+      <stop offset=".45" stop-color="#ff2b2b"/>
+      <stop offset="1" stop-color="#ff7659"/>
+    </linearGradient>
+    <filter id="grain">
+      <feTurbulence baseFrequency=".8" numOctaves="3" seed="8" type="fractalNoise" result="noise"/>
+      <feColorMatrix in="noise" type="saturate" values="0"/>
+      <feComponentTransfer><feFuncA type="table" tableValues="0 .07"/></feComponentTransfer>
+    </filter>
+    <clipPath id="rounded"><rect x="18" y="18" width="988" height="988" rx="210"/></clipPath>
+  </defs>
+  <g clip-path="url(#rounded)">
+    <rect width="1024" height="1024" fill="#fbf6e9"/>
+    <circle cx="800" cy="190" r="155" fill="#ffc515"/>
+    <path d="M54 352c28-57 96-49 121-11 19-39 90-34 101 22 44-10 91 23 94 72H62c-39-7-44-49-8-83z" fill="#ef2026"/>
+    <path d="M95 398 L758 266 L925 403 L301 553 Z" fill="url(#plane1)"/>
+    <path d="M222 692 L759 566 L931 702 L413 843 Z" fill="url(#plane2)"/>
+    <path d="M255 455 L395 322 L505 477 Z" fill="#f8c8d9"/>
+    <path d="M324 421 L395 322 L505 477 Z" fill="#f1b8cf"/>
+    <ellipse cx="565" cy="414" rx="74" ry="31" fill="#7d1a5b" opacity=".55"/>
+    <g stroke="#0861cb" stroke-width="23" stroke-linecap="round">
+      <path d="M521 -30 L521 1075"/>
+      <path d="M626 -30 L626 1075"/>
+      <path d="M521 34 L626 4 M521 108 L626 78 M521 182 L626 152 M521 256 L626 226 M521 330 L626 300 M521 404 L626 374 M521 478 L626 448 M521 552 L626 522 M521 626 L626 596 M521 700 L626 670 M521 774 L626 744 M521 848 L626 818 M521 922 L626 892"/>
+    </g>
+    <path d="M64 807 C173 573 377 600 520 686 C650 764 825 713 981 461" fill="none" stroke="url(#ribbon)" stroke-width="44" stroke-linecap="round"/>
+    <path d="M587 724V595c0-52 43-94 95-94s95 42 95 94v129h-59V600c0-25-16-43-36-43s-36 18-36 43v124z" fill="#0564c9"/>
+    <path d="M718 600c0-25-16-43-36-43v-56c52 0 95 42 95 94v129h-59z" fill="#f23841"/>
+    <path d="M89 206 L305 65 L356 92 L171 220 Z" fill="#ffbb13"/>
+    <circle cx="318" cy="205" r="42" fill="#19a8db"/>
+    <circle cx="394" cy="136" r="24" fill="#ff6813"/>
+    <path d="M879 466 L1014 420 L1014 530 Z" fill="#ef2026"/>
+    <ellipse cx="868" cy="592" rx="65" ry="26" fill="#10bac3" transform="rotate(47 868 592)"/>
+    <circle cx="881" cy="811" r="40" fill="#ef2026"/>
+    <g fill="#111d2e">
+      <circle cx="95" cy="158" r="5"/><circle cx="121" cy="136" r="4"/><circle cx="145" cy="122" r="3"/>
+      <circle cx="790" cy="785" r="4"/><circle cx="815" cy="806" r="4"/><circle cx="840" cy="827" r="4"/>
+    </g>
+    <rect width="1024" height="1024" filter="url(#grain)" opacity=".65"/>
+  </g>
+</svg>
