@@ -1,4 +1,3 @@
-import AppKit
 import SwiftUI
 
 struct StartScreen: View {
@@ -7,28 +6,28 @@ struct StartScreen: View {
 	var body: some View {
 		GeometryReader { proxy in
 			ZStack {
-				if let image = SplashImageData.image {
-					Image(nsImage: image)
-						.resizable()
-						.scaledToFill()
-						.frame(width: proxy.size.width, height: proxy.size.height)
-						.clipped()
-				} else {
-					Color(red: 0.98, green: 0.96, blue: 0.90)
-				}
+				Image("GifInStillsSplash")
+					.resizable()
+					.interpolation(.high)
+					.antialiased(true)
+					.scaledToFill()
+					.frame(width: proxy.size.width, height: proxy.size.height)
+					.clipped()
 
 				VStack {
 					Spacer()
 
-					VStack(spacing: 9) {
+					VStack(spacing: 10) {
 						if appState.isOpeningVideo {
 							ProgressView("Opening…")
 						} else {
 							Text("Drop images or a video")
 								.font(.headline)
+
 							Text("Turn stills into a GIF or social-ready MP4.")
 								.font(.subheadline)
 								.foregroundStyle(.secondary)
+
 							Button("Choose Files…", systemImage: "plus") {
 								appState.isFileImporterPresented = true
 							}
@@ -36,11 +35,11 @@ struct StartScreen: View {
 							.controlSize(.large)
 						}
 					}
-					.padding(.horizontal, 24)
-					.padding(.vertical, 14)
+					.padding(.horizontal, 26)
+					.padding(.vertical, 16)
 					.background(.ultraThinMaterial, in: .rect(cornerRadius: 18))
-					.shadow(color: .black.opacity(0.08), radius: 20, y: 8)
-					.padding(.bottom, 22)
+					.shadow(color: .black.opacity(0.10), radius: 20, y: 8)
+					.padding(.bottom, 24)
 				}
 				.padding(.horizontal, 24)
 			}
