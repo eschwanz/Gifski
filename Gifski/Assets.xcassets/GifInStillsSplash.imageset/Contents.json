@@ -1,15 +1,13 @@
 {
   "images": [
     {
-      "filename": "GifInStillsSplash.svg",
-      "idiom": "universal"
+      "filename": "GifInStillsSplash.png",
+      "idiom": "universal",
+      "scale": "1x"
     }
   ],
   "info": {
     "author": "xcode",
     "version": 1
-  },
-  "properties": {
-    "preserves-vector-representation": true
   }
 }
