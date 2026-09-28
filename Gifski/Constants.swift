@@ -4,6 +4,7 @@ import AVFoundation
 
 enum Constants {
 	static let allowedFrameRate = 3.0...50.0
+	static let allowedImageSequenceFrameRate = 0.1...50.0
 	static let loopCountRange = 0...100
 }
 
