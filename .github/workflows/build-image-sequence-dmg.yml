@@ -4,9 +4,6 @@ concurrency:
   group: gif-in-stills-${{ github.ref }}
   cancel-in-progress: true
 
-permissions:
-  contents: write
-
 on:
   push:
     branches:
@@ -31,54 +28,17 @@ jobs:
       - name: Install SwiftLint
         run: brew install swiftlint
 
-      - name: Migrate splash artwork to asset catalog
-        id: splash
-        shell: bash
+      - name: Validate splash artwork
         run: |
           set -euo pipefail
-          SPLASH="Gifski/Assets.xcassets/GifInStillsSplash.imageset/GifInStillsSplash.jpg"
-
-          if compgen -G "Gifski/Components/SplashImagePart*.swift" > /dev/null; then
-            python3 <<'PY'
-          import base64
-          import glob
-          import pathlib
-          import re
-
-          parts = []
-          for file in sorted(glob.glob("Gifski/Components/SplashImagePart*.swift")):
-              text = pathlib.Path(file).read_text()
-              match = re.search(r'#"""\s*(.*?)\s*"""#', text, re.S)
-              if not match:
-                  raise RuntimeError(f"Could not read embedded splash chunk: {file}")
-              parts.append(re.sub(r"\s+", "", match.group(1)))
-
-          data = base64.b64decode("".join(parts), validate=True)
-          path = pathlib.Path("Gifski/Assets.xcassets/GifInStillsSplash.imageset/GifInStillsSplash.jpg")
-          path.write_bytes(data)
-          print(f"Wrote {len(data):,} bytes to {path}")
-          PY
-
-            git rm -f Gifski/Components/SplashImageData.swift Gifski/Components/SplashImagePart*.swift
-            git add "$SPLASH"
-            echo "migrated=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "migrated=false" >> "$GITHUB_OUTPUT"
+          SPLASH="Gifski/Assets.xcassets/GifInStillsSplash.imageset/GifInStillsSplash.svg"
+          test -s "$SPLASH"
+          grep -q '<svg' "$SPLASH"
+          grep -q "Gif.in Stills" "$SPLASH"
+          if compgen -G "Gifski/Components/SplashImage*.swift" > /dev/null; then
+            echo "Obsolete embedded splash source still exists."
+            exit 1
           fi
-
-          WIDTH="$(sips -g pixelWidth "$SPLASH" | awk '/pixelWidth/ {print $2}')"
-          HEIGHT="$(sips -g pixelHeight "$SPLASH" | awk '/pixelHeight/ {print $2}')"
-          echo "Splash dimensions: ${WIDTH}x${HEIGHT}"
-          test "$WIDTH" -ge 1600
-          test "$HEIGHT" -ge 900
-
-      - name: Commit migrated splash asset
-        if: steps.splash.outputs.migrated == 'true'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "Migrate splash artwork to asset catalog"
-          git push origin "HEAD:${GITHUB_REF_NAME}"
 
       - name: Resolve packages
         run: xcodebuild -resolvePackageDependencies -project Gifski.xcodeproj -scheme Gifski
