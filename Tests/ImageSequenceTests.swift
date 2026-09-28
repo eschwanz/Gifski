@@ -7,6 +7,19 @@ import UniformTypeIdentifiers
 
 struct ImageSequenceTests {
 	@Test
+	func fractionalLowFrameRateDuration() {
+		let urls = (0..<2).map { URL(filePath: "/tmp/slow-frame\($0).png") }
+		let job = ImageSequenceJob(
+			urls: urls,
+			frameRate: 0.5,
+			outputWidth: 64,
+			outputHeight: 64
+		)
+
+		#expect(abs(job.duration - 4.0) < 0.0001)
+	}
+
+	@Test
 	func bounceFrameOrder() {
 		let urls = (0..<4).map { URL(filePath: "/tmp/frame\($0).png") }
 		let job = ImageSequenceJob(
@@ -94,7 +107,7 @@ struct ImageSequenceTests {
 
 		let job = ImageSequenceJob(
 			urls: fixture.urls,
-			frameRate: 10,
+			frameRate: 0.5,
 			outputWidth: 64,
 			outputHeight: 64,
 			outputFormat: .mp4
@@ -105,7 +118,7 @@ struct ImageSequenceTests {
 
 		let asset = AVURLAsset(url: outputURL)
 		let duration = try await asset.load(.duration)
-		#expect(abs(duration.seconds - 0.2) < 0.03)
+		#expect(abs(duration.seconds - 4.0) < 0.03)
 
 		let track = try #require(try await asset.loadTracks(withMediaType: .video).first)
 		let size = try await track.load(.naturalSize)
