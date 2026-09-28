@@ -21,15 +21,15 @@ struct ImageSequenceScreen: View {
 	}
 
 	var body: some View {
-		VStack(spacing: 10) {
-			preview
+		VStack(spacing: 12) {
+			previewSection
 			settingsCard
 			frameList
 		}
 		.padding(.horizontal, 16)
-		.padding(.top, 10)
+		.padding(.top, 12)
 		.navigationTitle("Gif’in Stills")
-		.navigationSubtitle("\(job.urls.count) images • \(job.duration.formatted(.number.precision(.fractionLength(2)))) s")
+		.navigationSubtitle(exportSummaryLine)
 		.safeAreaInset(edge: .bottom) {
 			bottomBar
 				.padding(.horizontal, 16)
@@ -47,19 +47,22 @@ struct ImageSequenceScreen: View {
 				appState.error = error
 			}
 		}
-		.border(isDropTargeted ? Color.accentColor : .clear, width: 4, cornerRadius: 10)
+		.border(isDropTargeted ? Color.accentColor : .clear, width: 4, cornerRadius: 12)
 		.onDrop(of: [UTType.fileURL.identifier], isTargeted: $isDropTargeted) { providers in
 			Task {
 				var urls = [URL]()
+
 				for provider in providers {
 					if let url = await provider.getURL(), ImageSequenceLoader.isImage(url) {
 						urls.append(url)
 					}
 				}
+
 				await MainActor.run {
 					addImages(urls)
 				}
 			}
+
 			return true
 		}
 		.task(id: gifEstimateTaskID) {
@@ -85,77 +88,130 @@ struct ImageSequenceScreen: View {
 		}
 	}
 
-	private var gifEstimateTaskID: String {
-		[
-			job.outputFormat.rawValue,
-			String(job.frameRate),
-			String(job.quality),
-			String(job.loop),
-			String(job.bounce),
-			String(job.outputWidth),
-			String(job.outputHeight),
-			job.urls.map(\.path).joined(separator: "|")
-		].joined(separator: ":")
-	}
+	// MARK: Preview
 
-	private var previewTaskID: String {
-		"\(job.frameRate)-\(job.urls.count)-\(job.bounce)-\(isPlaying)"
-	}
+	private var previewSection: some View {
+		GeometryReader { proxy in
+			let container = CGSize(
+				width: max(1, proxy.size.width - 36),
+				height: max(1, proxy.size.height - 36)
+			)
+			let target = CGSize(
+				width: CGFloat(max(displayedOutputDimensions.width, 1)),
+				height: CGFloat(max(displayedOutputDimensions.height, 1))
+			)
+			let canvasSize = fittedSize(container: container, aspect: target)
 
-	private var previewSourceIndex: Int {
-		let indices = job.frameIndices
-		guard !indices.isEmpty else {
-			return 0
-		}
-		return indices[previewPosition.clamped(to: 0...(indices.count - 1))]
-	}
+			ZStack {
+				RoundedRectangle(cornerRadius: 14)
+					.fill(.black.opacity(0.055))
 
-	private var preview: some View {
-		ZStack(alignment: .bottomTrailing) {
-			RoundedRectangle(cornerRadius: 10)
-				.fill(.black.opacity(0.06))
+				ZStack {
+					Rectangle()
+						.fill(job.outputFormat == .mp4 ? Color.white : Color.clear)
 
-			if
-				job.urls.indices.contains(previewSourceIndex),
-				let image = NSImage(contentsOf: job.urls[previewSourceIndex])
-			{
-				Image(nsImage: image)
-					.resizable()
-					.scaledToFit()
-					.padding(8)
-			} else {
-				ContentUnavailableView("Drop Images Here", systemImage: "photo.on.rectangle.angled")
-			}
-
-			HStack(spacing: 8) {
-				Button {
-					isPlaying.toggle()
-				} label: {
-					Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+					previewImageView
+						.padding(8)
 				}
-				.buttonStyle(.glass)
+				.frame(width: canvasSize.width, height: canvasSize.height)
+				.background(.white.opacity(job.outputFormat == .mp4 ? 1 : 0.45))
+				.clipShape(.rect(cornerRadius: 10))
+				.overlay {
+					RoundedRectangle(cornerRadius: 10)
+						.stroke(.black.opacity(0.10), lineWidth: 1)
+				}
+				.shadow(color: .black.opacity(0.08), radius: 8, y: 3)
+				.position(x: proxy.size.width / 2, y: proxy.size.height / 2)
 
-				Text("\(previewSourceIndex + 1) / \(job.urls.count)")
-					.monospacedDigit()
-					.font(.caption)
-					.foregroundStyle(.secondary)
+				VStack {
+					HStack {
+						Label(
+							"\(displayedOutputDimensions.width) × \(displayedOutputDimensions.height)",
+							systemImage: "rectangle.aspectratio"
+						)
+						.font(.caption.weight(.medium))
+						.padding(.horizontal, 10)
+						.padding(.vertical, 6)
+						.background(.ultraThinMaterial, in: Capsule())
+
+						Spacer()
+
+						Text("\(previewSourceIndex + 1) / \(job.urls.count)")
+							.font(.caption.weight(.medium))
+							.monospacedDigit()
+							.padding(.horizontal, 10)
+							.padding(.vertical, 6)
+							.background(.ultraThinMaterial, in: Capsule())
+					}
+
+					Spacer()
+
+					HStack {
+						Text(previewOverlaySubtitle)
+							.font(.caption)
+							.foregroundStyle(.secondary)
+							.padding(.horizontal, 10)
+							.padding(.vertical, 6)
+							.background(.ultraThinMaterial, in: Capsule())
+
+						Spacer()
+
+						Button {
+							isPlaying.toggle()
+						} label: {
+							Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+								.font(.system(size: 13, weight: .semibold))
+								.frame(width: 34, height: 34)
+						}
+						.buttonStyle(.plain)
+						.background(.ultraThinMaterial, in: Circle())
+					}
+				}
+				.padding(12)
 			}
-			.padding(8)
 		}
-		.frame(height: 180)
+		.frame(minHeight: 220, idealHeight: 260, maxHeight: 300)
 	}
+
+	@ViewBuilder
+	private var previewImageView: some View {
+		if
+			job.urls.indices.contains(previewSourceIndex),
+			let image = NSImage(contentsOf: job.urls[previewSourceIndex])
+		{
+			Image(nsImage: image)
+				.resizable()
+				.interpolation(.high)
+				.antialiased(true)
+				.scaledToFit()
+		} else {
+			ContentUnavailableView("Drop Images Here", systemImage: "photo.on.rectangle.angled")
+		}
+	}
+
+	// MARK: Settings
 
 	private var settingsCard: some View {
 		VStack(alignment: .leading, spacing: 10) {
+			HStack {
+				Text("Export")
+					.font(.headline)
+				Spacer()
+				outputSummary
+			}
+
 			ViewThatFits(in: .horizontal) {
 				HStack(spacing: 14) {
 					formatControl
 					speedControl
 					Toggle("Bounce", isOn: $job.bounce)
+
 					if job.outputFormat == .gif {
 						Toggle("Loop", isOn: $job.loop)
 					}
+
 					Spacer(minLength: 0)
+
 					if job.outputFormat == .gif {
 						qualityControl
 					}
@@ -166,10 +222,12 @@ struct ImageSequenceScreen: View {
 						formatControl
 						speedControl
 						Toggle("Bounce", isOn: $job.bounce)
+
 						if job.outputFormat == .gif {
 							Toggle("Loop", isOn: $job.loop)
 						}
 					}
+
 					if job.outputFormat == .gif {
 						qualityControl
 					}
@@ -181,25 +239,26 @@ struct ImageSequenceScreen: View {
 			ViewThatFits(in: .horizontal) {
 				HStack(spacing: 14) {
 					dimensionsControl
+
 					if job.outputFormat == .mp4 {
 						socialPresetControl
 					}
+
 					Spacer(minLength: 0)
-					outputSummary
 				}
 
 				VStack(alignment: .leading, spacing: 8) {
 					dimensionsControl
+
 					if job.outputFormat == .mp4 {
 						socialPresetControl
 					}
-					outputSummary
 				}
 			}
 		}
 		.controlSize(.small)
-		.padding(10)
-		.background(.quaternary.opacity(0.35), in: .rect(cornerRadius: 10))
+		.padding(12)
+		.background(.quaternary.opacity(0.35), in: .rect(cornerRadius: 12))
 	}
 
 	private var formatControl: some View {
@@ -237,11 +296,11 @@ struct ImageSequenceScreen: View {
 		HStack(spacing: 6) {
 			Text("Size")
 			TextField("W", value: widthBinding, format: .number)
-				.frame(width: 70)
+				.frame(width: 76)
 				.multilineTextAlignment(.trailing)
 			Text("×")
 			TextField("H", value: heightBinding, format: .number)
-				.frame(width: 70)
+				.frame(width: 76)
 				.multilineTextAlignment(.trailing)
 			Text("px")
 				.foregroundStyle(.secondary)
@@ -249,24 +308,22 @@ struct ImageSequenceScreen: View {
 	}
 
 	private var socialPresetControl: some View {
-		Picker("Preset", selection: $job.socialVideoPreset) {
-			ForEach(SocialVideoPreset.allCases) { preset in
-				Text(preset == .custom ? preset.rawValue : "\(preset.rawValue) — \(preset.detail)")
-					.tag(preset)
+		HStack(spacing: 6) {
+			Text("Preset")
+			Picker("Preset", selection: $job.socialVideoPreset) {
+				ForEach(SocialVideoPreset.allCases) { preset in
+					Text(preset == .custom ? preset.rawValue : "\(preset.rawValue) — \(preset.detail)")
+						.tag(preset)
+				}
 			}
+			.labelsHidden()
+			.frame(maxWidth: 360)
 		}
-		.frame(maxWidth: 330)
 	}
 
 	private var outputSummary: some View {
-		let dimensions = displayedOutputDimensions
-
-		return HStack(spacing: 6) {
-			Text("\(dimensions.width) × \(dimensions.height) • \(job.outputFormat == .mp4 ? "H.264" : "GIF")")
-
+		HStack(spacing: 6) {
 			if job.outputFormat == .gif, job.urls.count >= 2 {
-				Text("•")
-
 				if isEstimatingGIFSize {
 					ProgressView()
 						.controlSize(.mini)
@@ -275,10 +332,182 @@ struct ImageSequenceScreen: View {
 					Text("Estimated \(ByteCountFormatter.string(fromByteCount: Int64(estimatedGIFBytes), countStyle: .file))")
 						.fontWeight(.medium)
 				}
+			} else if job.outputFormat == .mp4 {
+				Text("H.264")
 			}
 		}
 		.font(.caption)
 		.foregroundStyle(.secondary)
+	}
+
+	// MARK: Frames
+
+	private var frameList: some View {
+		VStack(alignment: .leading, spacing: 8) {
+			HStack {
+				Text("Frames")
+					.font(.headline)
+
+				Text("Drag rows to reorder")
+					.font(.caption)
+					.foregroundStyle(.secondary)
+
+				Spacer()
+
+				Button("Add Images", systemImage: "plus") {
+					isAddingImages = true
+				}
+			}
+
+			List {
+				ForEach(Array(job.urls.enumerated()), id: \.element) { index, url in
+					HStack(spacing: 10) {
+						if let image = NSImage(contentsOf: url) {
+							Image(nsImage: image)
+								.resizable()
+								.scaledToFill()
+								.frame(width: 44, height: 36)
+								.clipped()
+								.clipShape(.rect(cornerRadius: 5))
+						}
+
+						VStack(alignment: .leading, spacing: 2) {
+							Text(url.lastPathComponent)
+								.lineLimit(1)
+
+							Text("Frame \(index + 1)")
+								.font(.caption2)
+								.foregroundStyle(.secondary)
+						}
+
+						Spacer()
+
+						Button(role: .destructive) {
+							removeFrame(at: index)
+						} label: {
+							Image(systemName: "trash")
+						}
+						.buttonStyle(.borderless)
+						.disabled(job.urls.count <= 2)
+					}
+					.padding(.vertical, 2)
+				}
+				.onMove(perform: moveFrames)
+			}
+			.frame(maxHeight: .infinity)
+		}
+	}
+
+	// MARK: Bottom bar
+
+	private var bottomBar: some View {
+		HStack(spacing: 12) {
+			if job.urls.count < 2 {
+				Label("Add at least one more image", systemImage: "exclamationmark.triangle")
+					.font(.caption)
+					.foregroundStyle(.secondary)
+			} else {
+				Text(exportSummaryLine)
+					.font(.caption)
+					.foregroundStyle(.secondary)
+
+				if job.outputFormat == .gif {
+					Text("•")
+						.foregroundStyle(.secondary)
+
+					if isEstimatingGIFSize {
+						Text("Estimating…")
+							.font(.caption)
+							.foregroundStyle(.secondary)
+					} else if let estimatedGIFBytes {
+						Text("~\(ByteCountFormatter.string(fromByteCount: Int64(estimatedGIFBytes), countStyle: .file))")
+							.font(.caption.weight(.medium))
+							.foregroundStyle(.secondary)
+					}
+				}
+			}
+
+			Spacer()
+
+			Button(createButtonTitle, systemImage: "sparkles") {
+				guard job.outputWidth >= 2, job.outputHeight >= 2 else {
+					appState.error = ImageSequenceError.invalidDimensions
+					return
+				}
+
+				var exportJob = job
+
+				if exportJob.outputFormat == .mp4 {
+					let dimensions = exportJob.effectiveMP4Dimensions
+					exportJob.outputWidth = dimensions.width
+					exportJob.outputHeight = dimensions.height
+				}
+
+				switch exportJob.outputFormat {
+				case .gif:
+					appState.navigationPath.append(.imageSequenceConversion(exportJob))
+				case .mp4:
+					appState.navigationPath.append(.imageSequenceVideoConversion(exportJob))
+				}
+			}
+			.buttonStyle(.borderedProminent)
+			.disabled(job.urls.count < 2)
+			.keyboardShortcut(.return, modifiers: [.command])
+		}
+	}
+
+	// MARK: Computed values
+
+	private var gifEstimateTaskID: String {
+		[
+			job.outputFormat.rawValue,
+			String(job.frameRate),
+			String(job.quality),
+			String(job.loop),
+			String(job.bounce),
+			String(job.outputWidth),
+			String(job.outputHeight),
+			job.urls.map(\.path).joined(separator: "|")
+		].joined(separator: ":")
+	}
+
+	private var previewTaskID: String {
+		"\(job.frameRate)-\(job.urls.count)-\(job.bounce)-\(isPlaying)"
+	}
+
+	private var previewSourceIndex: Int {
+		let indices = job.frameIndices
+
+		guard !indices.isEmpty else {
+			return 0
+		}
+
+		return indices[previewPosition.clamped(to: 0...(indices.count - 1))]
+	}
+
+	private var displayedOutputDimensions: (width: Int, height: Int) {
+		job.outputFormat == .mp4
+			? job.effectiveMP4Dimensions
+			: (job.outputWidth, job.outputHeight)
+	}
+
+	private var createButtonTitle: String {
+		job.outputFormat == .gif ? "Create GIF" : "Create MP4"
+	}
+
+	private var previewOverlaySubtitle: String {
+		"\(job.outputFormat.rawValue) · \(job.frameRate) FPS · \(job.duration.formatted(.number.precision(.fractionLength(2)))) s"
+	}
+
+	private var exportSummaryLine: String {
+		let dimensions = displayedOutputDimensions
+		var summary = "\(job.outputFormat.rawValue) · \(dimensions.width) × \(dimensions.height) · \(job.frameRate) FPS · \(job.urls.count) frames · \(job.duration.formatted(.number.precision(.fractionLength(2)))) s"
+
+		if job.outputFormat == .mp4 {
+			summary += " · H.264"
+		}
+
+		return summary
 	}
 
 	private var widthBinding: Binding<Int> {
@@ -305,117 +534,19 @@ struct ImageSequenceScreen: View {
 		)
 	}
 
-	private var displayedOutputDimensions: (width: Int, height: Int) {
-		job.outputFormat == .mp4 ? job.effectiveMP4Dimensions : (job.outputWidth, job.outputHeight)
-	}
+	// MARK: Actions
 
-	private var frameList: some View {
-		VStack(alignment: .leading, spacing: 6) {
-			HStack {
-				Text("Frames")
-					.font(.headline)
-				Text("Drag rows to reorder")
-					.font(.caption)
-					.foregroundStyle(.secondary)
-				Spacer()
-				Button("Add", systemImage: "plus") {
-					isAddingImages = true
-				}
-			}
-
-			List {
-				ForEach(Array(job.urls.enumerated()), id: \.element) { index, url in
-					HStack(spacing: 8) {
-						if let image = NSImage(contentsOf: url) {
-							Image(nsImage: image)
-								.resizable()
-								.scaledToFill()
-								.frame(width: 42, height: 30)
-								.clipped()
-								.clipShape(.rect(cornerRadius: 4))
-						}
-
-						Text(url.lastPathComponent)
-							.lineLimit(1)
-						Spacer()
-						Text("\(index + 1)")
-							.font(.caption)
-							.foregroundStyle(.tertiary)
-							.monospacedDigit()
-						Button(role: .destructive) {
-							removeFrame(at: index)
-						} label: {
-							Image(systemName: "trash")
-						}
-						.buttonStyle(.borderless)
-						.disabled(job.urls.count <= 2)
-					}
-				}
-				.onMove(perform: moveFrames)
-			}
-			.frame(maxHeight: .infinity)
+	private func fittedSize(container: CGSize, aspect: CGSize) -> CGSize {
+		guard aspect.width > 0, aspect.height > 0 else {
+			return CGSize(width: 200, height: 200)
 		}
-	}
 
-	private var bottomBar: some View {
-		HStack(spacing: 12) {
-			Button("Add Images", systemImage: "plus") {
-				isAddingImages = true
-			}
+		let scale = min(container.width / aspect.width, container.height / aspect.height)
 
-			Spacer()
-
-			if job.urls.count < 2 {
-				Label("Add at least one more image", systemImage: "exclamationmark.triangle")
-					.font(.caption)
-					.foregroundStyle(.secondary)
-			} else {
-				HStack(spacing: 6) {
-					Text("\(job.urls.count) frames • \(job.duration.formatted(.number.precision(.fractionLength(2)))) s")
-
-					if job.outputFormat == .gif {
-						Text("•")
-
-						if isEstimatingGIFSize {
-							Text("Estimating…")
-						} else if let estimatedGIFBytes {
-							Text("~\(ByteCountFormatter.string(fromByteCount: Int64(estimatedGIFBytes), countStyle: .file))")
-								.fontWeight(.medium)
-						}
-					}
-				}
-				.font(.caption)
-				.foregroundStyle(.secondary)
-			}
-
-			Button(createButtonTitle, systemImage: "sparkles") {
-				guard job.outputWidth >= 2, job.outputHeight >= 2 else {
-					appState.error = ImageSequenceError.invalidDimensions
-					return
-				}
-
-				var exportJob = job
-				if exportJob.outputFormat == .mp4 {
-					let dimensions = exportJob.effectiveMP4Dimensions
-					exportJob.outputWidth = dimensions.width
-					exportJob.outputHeight = dimensions.height
-				}
-
-				switch exportJob.outputFormat {
-				case .gif:
-					appState.navigationPath.append(.imageSequenceConversion(exportJob))
-				case .mp4:
-					appState.navigationPath.append(.imageSequenceVideoConversion(exportJob))
-				}
-			}
-			.buttonStyle(.borderedProminent)
-			.disabled(job.urls.count < 2)
-			.keyboardShortcut(.return, modifiers: [.command])
-		}
-	}
-
-	private var createButtonTitle: String {
-		job.outputFormat == .gif ? "Create GIF" : "Create MP4"
+		return CGSize(
+			width: max(1, aspect.width * scale),
+			height: max(1, aspect.height * scale)
+		)
 	}
 
 	private func updateGIFSizeEstimate() async {
@@ -465,6 +596,7 @@ struct ImageSequenceScreen: View {
 
 	private func applyOutputFormat() {
 		previewPosition = 0
+
 		if job.outputFormat == .gif {
 			job.outputWidth = customWidth
 			job.outputHeight = customHeight
@@ -482,11 +614,14 @@ struct ImageSequenceScreen: View {
 
 		var seen = Set(job.urls.map(\.standardizedFileURL))
 		var additions = [URL]()
+
 		for url in sortedCandidates {
 			let key = url.standardizedFileURL
+
 			guard seen.insert(key).inserted else {
 				continue
 			}
+
 			appState.beginImageSequenceSecurityScopedAccess(url)
 			additions.append(url)
 		}
@@ -527,8 +662,10 @@ struct ImageSequenceConversionScreen: View {
 			ProgressView(value: progress)
 				.progressViewStyle(.circular)
 				.controlSize(.large)
+
 			Text("Creating GIF")
 				.font(.headline)
+
 			Text(progress, format: .percent.precision(.fractionLength(0)))
 				.monospacedDigit()
 				.foregroundStyle(.secondary)
