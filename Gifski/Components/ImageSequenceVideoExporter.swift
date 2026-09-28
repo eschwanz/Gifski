@@ -148,7 +148,7 @@ actor ImageSequenceVideoExporter {
 	}
 
 	private static func recommendedBitrate(width: Int, height: Int, frameRate: Double) -> Int {
-		let calculated = Int(Double(width * height * frameRate) * 0.08)
+		let calculated = Int(Double(width * height) * frameRate * 0.08)
 		return calculated.clamped(to: 2_000_000...12_000_000)
 	}
 
