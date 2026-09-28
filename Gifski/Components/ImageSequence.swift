@@ -53,7 +53,7 @@ enum SocialVideoPreset: String, CaseIterable, Identifiable, Hashable {
 
 struct ImageSequenceJob: Hashable {
 	var urls: [URL]
-	var frameRate: Int
+	var frameRate: Double
 	var quality: Double
 	var loop: Bool
 	var bounce: Bool
@@ -64,7 +64,7 @@ struct ImageSequenceJob: Hashable {
 
 	init(
 		urls: [URL],
-		frameRate: Int = 10,
+		frameRate: Double = 10,
 		quality: Double = 1,
 		loop: Bool = true,
 		bounce: Bool = false,
@@ -101,7 +101,7 @@ struct ImageSequenceJob: Hashable {
 	}
 
 	var duration: Double {
-		Double(frameIndices.count) / Double(max(frameRate, 1))
+		Double(frameIndices.count) / max(frameRate, 0.1)
 	}
 
 	var effectiveMP4Dimensions: (width: Int, height: Int) {
@@ -231,7 +231,7 @@ actor ImageSequenceGenerator {
 			loop: loop
 		)
 
-		let frameRate = Double(job.frameRate.clamped(to: Int(Constants.allowedFrameRate.lowerBound)...Int(Constants.allowedFrameRate.upperBound)))
+		let frameRate = job.frameRate.clamped(to: Constants.allowedImageSequenceFrameRate)
 		let frameDuration = 1 / frameRate
 		let orderedIndices = job.frameIndices
 
@@ -287,7 +287,7 @@ extension AppState {
 			let firstImage = try ImageSequenceLoader.loadCGImage(sortedURLs[0])
 			let job = ImageSequenceJob(
 				urls: sortedURLs,
-				frameRate: Defaults[.outputFPS],
+				frameRate: Double(Defaults[.outputFPS]),
 				quality: Defaults[.outputQuality],
 				loop: Defaults[.loopGIF],
 				bounce: Defaults[.bounceGIF],
