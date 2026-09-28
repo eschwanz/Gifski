@@ -70,7 +70,7 @@ struct ImageSequenceScreen: View {
 		}
 		.task(id: previewTaskID) {
 			while !Task.isCancelled {
-				let nanoseconds = UInt64((1_000_000_000 / Double(max(job.frameRate, 1))).rounded())
+				let nanoseconds = UInt64((1_000_000_000 / max(job.frameRate, 0.1)).rounded())
 				try? await Task.sleep(nanoseconds: nanoseconds)
 
 				guard isPlaying, !job.frameIndices.isEmpty else {
@@ -106,22 +106,28 @@ struct ImageSequenceScreen: View {
 				RoundedRectangle(cornerRadius: 14)
 					.fill(.black.opacity(0.055))
 
-				ZStack {
-					Rectangle()
-						.fill(job.outputFormat == .mp4 ? Color.white : Color.clear)
+				HStack {
+					Spacer(minLength: 18)
 
-					previewImageView
-						.padding(8)
+					ZStack {
+						Rectangle()
+							.fill(job.outputFormat == .mp4 ? Color.white : Color.clear)
+
+						previewImageView
+							.padding(8)
+					}
+					.frame(width: canvasSize.width, height: canvasSize.height)
+					.background(.white.opacity(job.outputFormat == .mp4 ? 1 : 0.45))
+					.clipShape(.rect(cornerRadius: 10))
+					.overlay {
+						RoundedRectangle(cornerRadius: 10)
+							.stroke(.black.opacity(0.10), lineWidth: 1)
+					}
+					.shadow(color: .black.opacity(0.08), radius: 8, y: 3)
+
+					Spacer(minLength: 18)
 				}
-				.frame(width: canvasSize.width, height: canvasSize.height)
-				.background(.white.opacity(job.outputFormat == .mp4 ? 1 : 0.45))
-				.clipShape(.rect(cornerRadius: 10))
-				.overlay {
-					RoundedRectangle(cornerRadius: 10)
-						.stroke(.black.opacity(0.10), lineWidth: 1)
-				}
-				.shadow(color: .black.opacity(0.08), radius: 8, y: 3)
-				.position(x: proxy.size.width / 2, y: proxy.size.height / 2)
+				.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
 
 				VStack {
 					HStack {
@@ -274,9 +280,14 @@ struct ImageSequenceScreen: View {
 	private var speedControl: some View {
 		HStack(spacing: 6) {
 			Text("Speed")
-			Stepper(value: $job.frameRate, in: 3...50) {
-				Text("\(job.frameRate) FPS")
+			Stepper(
+				value: $job.frameRate,
+				in: Constants.allowedImageSequenceFrameRate,
+				step: 0.1
+			) {
+				Text("\(frameRateText) FPS")
 					.monospacedDigit()
+					.frame(minWidth: 58, alignment: .trailing)
 			}
 		}
 	}
@@ -495,13 +506,17 @@ struct ImageSequenceScreen: View {
 		job.outputFormat == .gif ? "Create GIF" : "Create MP4"
 	}
 
+	private var frameRateText: String {
+		job.frameRate.formatted(.number.precision(.fractionLength(1)))
+	}
+
 	private var previewOverlaySubtitle: String {
-		"\(job.outputFormat.rawValue) · \(job.frameRate) FPS · \(job.duration.formatted(.number.precision(.fractionLength(2)))) s"
+		"\(job.outputFormat.rawValue) · \(frameRateText) FPS · \(job.duration.formatted(.number.precision(.fractionLength(2)))) s"
 	}
 
 	private var exportSummaryLine: String {
 		let dimensions = displayedOutputDimensions
-		var summary = "\(job.outputFormat.rawValue) · \(dimensions.width) × \(dimensions.height) · \(job.frameRate) FPS · \(job.urls.count) frames · \(job.duration.formatted(.number.precision(.fractionLength(2)))) s"
+		var summary = "\(job.outputFormat.rawValue) · \(dimensions.width) × \(dimensions.height) · \(frameRateText) FPS · \(job.urls.count) frames · \(job.duration.formatted(.number.precision(.fractionLength(2)))) s"
 
 		if job.outputFormat == .mp4 {
 			summary += " · H.264"
