@@ -11,7 +11,7 @@ on:
 jobs:
   macos-qa:
     runs-on: macos-26
-    timeout-minutes: 60
+    timeout-minutes: 40
     permissions:
       contents: read
     steps:
@@ -31,14 +31,18 @@ jobs:
           swiftlint version
       - name: Resolve packages
         run: xcodebuild -resolvePackageDependencies -project Gifski.xcodeproj -scheme Gifski
-      - name: Run native XCTest suite
+      - name: Build app and tests without executing
+        timeout-minutes: 15
         run: |
           set -o pipefail
-          xcodebuild test -project Gifski.xcodeproj -scheme Gifski -configuration Debug -destination 'platform=macOS' -resultBundlePath "$PWD/qa-results/GifInStills.xcresult" CODE_SIGNING_ALLOWED=NO 2>&1 | tee qa-results/xcodebuild-test.log
-      - name: Build app for smoke test
+          xcodebuild build-for-testing -project Gifski.xcodeproj -scheme Gifski -configuration Debug -destination 'platform=macOS' -derivedDataPath "$PWD/qa-derived" CODE_SIGNING_ALLOWED=NO 2>&1 | tee qa-results/xcodebuild-build.log
+      - name: Run native XCTest suite (bounded)
+        id: native_tests
+        timeout-minutes: 12
+        continue-on-error: true
         run: |
           set -o pipefail
-          xcodebuild build -project Gifski.xcodeproj -scheme Gifski -configuration Debug -destination 'platform=macOS' -derivedDataPath "$PWD/qa-derived" CODE_SIGNING_ALLOWED=NO 2>&1 | tee qa-results/xcodebuild-build.log
+          xcodebuild test-without-building -project Gifski.xcodeproj -scheme Gifski -configuration Debug -destination 'platform=macOS' -derivedDataPath "$PWD/qa-derived" -resultBundlePath "$PWD/qa-results/GifInStills.xcresult" -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO 2>&1 | tee qa-results/xcodebuild-test.log
       - name: Inspect application bundle
         run: |
           set -euo pipefail
@@ -49,13 +53,20 @@ jobs:
           /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Contents/Info.plist" | tee qa-results/bundle-id.txt
           codesign --verify --deep --strict "$APP" 2>&1 | tee qa-results/signature-check.txt || true
       - name: Capture UI smoke screenshot
+        if: always()
         continue-on-error: true
+        timeout-minutes: 2
         run: |
           APP="$(find qa-derived/Build/Products/Debug -maxdepth 1 -name '*.app' -type d | head -1)"
           open "$APP"
           sleep 12
           screencapture -x qa-results/launch.png
           test -s qa-results/launch.png
+      - name: Enforce native XCTest outcome
+        if: always() && steps.native_tests.outcome != 'success'
+        run: |
+          echo 'Native XCTest did not pass. See QA artifacts.' >&2
+          exit 1
       - name: Summarize test results
         if: always()
         run: |
