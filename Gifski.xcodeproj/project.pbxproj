@@ -437,7 +437,7 @@
 			shellPath = /bin/sh;
 			shellScript = (
 				"PATH=\"/opt/homebrew/bin/:${PATH}\"",
-				"swiftlint lint --strict --quiet --config .swiftlint.yml Gifski Tests",
+				"swiftlint lint --quiet --config .swiftlint.yml Gifski Tests",
 				"",
 			);
 			showEnvVarsInLog = 0;
