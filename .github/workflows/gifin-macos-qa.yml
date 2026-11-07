@@ -23,6 +23,7 @@ jobs:
           mkdir -p qa-results
       - name: Run 35 UI/UX source-contract checks
         run: |
+          set -o pipefail
           mkdir -p qa-results
           python3 qa/ux_contract_tests.py 2>&1 | tee qa-results/ux-contract-tests.log
       - name: Install required build tools
@@ -62,17 +63,17 @@ jobs:
           sleep 12
           screencapture -x qa-results/launch.png
           test -s qa-results/launch.png
-      - name: Enforce native XCTest outcome
-        if: always() && steps.native_tests.outcome != 'success'
-        run: |
-          echo 'Native XCTest did not pass. See QA artifacts.' >&2
-          exit 1
       - name: Summarize test results
         if: always()
         run: |
           if [ -d qa-results/GifInStills.xcresult ]; then
             xcrun xcresulttool get test-results summary --path qa-results/GifInStills.xcresult --format json > qa-results/test-summary.json || true
           fi
+      - name: Enforce native XCTest outcome
+        if: always() && steps.native_tests.outcome != 'success'
+        run: |
+          echo 'Native XCTest did not pass. See QA artifacts.' >&2
+          exit 1
       - name: Upload QA evidence
         if: always()
         uses: actions/upload-artifact@v4
