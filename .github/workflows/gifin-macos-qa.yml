@@ -6,6 +6,7 @@ on:
     paths:
       - 'Gifski/**'
       - 'Gifski.xcodeproj/**'
+      - 'qa/**'
       - '.github/workflows/gifin-macos-qa.yml'
 jobs:
   macos-qa:
@@ -20,6 +21,10 @@ jobs:
           xcodebuild -version
           xcrun simctl list devices || true
           mkdir -p qa-results
+      - name: Run 35 UI/UX source-contract checks
+        run: |
+          mkdir -p qa-results
+          python3 qa/ux_contract_tests.py 2>&1 | tee qa-results/ux-contract-tests.log
       - name: Resolve packages
         run: xcodebuild -resolvePackageDependencies -project Gifski.xcodeproj -scheme Gifski
       - name: Run native XCTest suite
