@@ -1,0 +1,83 @@
+name: Gif'in Stills macOS QA
+on:
+  workflow_dispatch:
+  push:
+    branches: [feature/image-sequences]
+    paths:
+      - 'Gifski/**'
+      - 'Gifski.xcodeproj/**'
+      - 'qa/**'
+      - '.github/workflows/gifin-macos-qa.yml'
+jobs:
+  macos-qa:
+    runs-on: macos-26
+    timeout-minutes: 40
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Xcode environment
+        run: |
+          xcodebuild -version
+          xcrun simctl list devices || true
+          mkdir -p qa-results
+      - name: Run 35 UI/UX source-contract checks
+        run: |
+          set -o pipefail
+          mkdir -p qa-results
+          python3 qa/ux_contract_tests.py 2>&1 | tee qa-results/ux-contract-tests.log
+      - name: Install required build tools
+        run: |
+          brew install swiftlint
+          swiftlint version
+      - name: Resolve packages
+        run: xcodebuild -resolvePackageDependencies -project Gifski.xcodeproj -scheme Gifski
+      - name: Build app and tests without executing
+        timeout-minutes: 15
+        run: |
+          set -o pipefail
+          xcodebuild build-for-testing -project Gifski.xcodeproj -scheme Gifski -configuration Debug -destination 'platform=macOS' -derivedDataPath "$PWD/qa-derived" CODE_SIGNING_ALLOWED=NO 2>&1 | tee qa-results/xcodebuild-build.log
+      - name: Run native XCTest suite (bounded)
+        id: native_tests
+        timeout-minutes: 12
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          xcodebuild test-without-building -project Gifski.xcodeproj -scheme Gifski -configuration Debug -destination 'platform=macOS' -derivedDataPath "$PWD/qa-derived" -resultBundlePath "$PWD/qa-results/GifInStills.xcresult" -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO 2>&1 | tee qa-results/xcodebuild-test.log
+      - name: Inspect application bundle
+        run: |
+          set -euo pipefail
+          APP="$(find qa-derived/Build/Products/Debug -maxdepth 1 -name '*.app' -type d | head -1)"
+          test -n "$APP"
+          test -f "$APP/Contents/Info.plist"
+          test -x "$APP/Contents/MacOS/"*
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Contents/Info.plist" | tee qa-results/bundle-id.txt
+          codesign --verify --deep --strict "$APP" 2>&1 | tee qa-results/signature-check.txt || true
+      - name: Capture UI smoke screenshot
+        if: always()
+        continue-on-error: true
+        timeout-minutes: 2
+        run: |
+          APP="$(find qa-derived/Build/Products/Debug -maxdepth 1 -name '*.app' -type d | head -1)"
+          open "$APP"
+          sleep 12
+          screencapture -x qa-results/launch.png
+          test -s qa-results/launch.png
+      - name: Summarize test results
+        if: always()
+        run: |
+          if [ -d qa-results/GifInStills.xcresult ]; then
+            xcrun xcresulttool get test-results summary --path qa-results/GifInStills.xcresult --format json > qa-results/test-summary.json || true
+          fi
+      - name: Enforce native XCTest outcome
+        if: always() && steps.native_tests.outcome != 'success'
+        run: |
+          echo 'Native XCTest did not pass. See QA artifacts.' >&2
+          exit 1
+      - name: Upload QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: GifIn-Stills-macOS-QA
+          path: qa-results/
+          if-no-files-found: warn

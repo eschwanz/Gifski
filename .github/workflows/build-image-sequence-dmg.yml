@@ -1,0 +1,157 @@
+name: Build Gif'in Stills DMG
+
+concurrency:
+  group: gif-in-stills-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+on:
+  push:
+    branches:
+      - feature/image-sequences
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-26
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Tool versions
+        run: |
+          xcodebuild -version
+          swift --version
+          rustc --version || true
+
+      - name: Install build tools
+        run: brew install swiftlint librsvg
+
+      - name: Migrate splash to raster asset
+        id: splash
+        shell: bash
+        run: |
+          set -euo pipefail
+          IMAGESET="Gifski/Assets.xcassets/GifInStillsSplash.imageset"
+          SVG="$IMAGESET/GifInStillsSplash.svg"
+          PNG="$IMAGESET/GifInStillsSplash.png"
+
+          if [ -f "$SVG" ]; then
+            rsvg-convert -w 1600 -h 900 "$SVG" -o "$PNG"
+            cat > "$IMAGESET/Contents.json" <<'JSON'
+          {
+            "images": [
+              {
+                "filename": "GifInStillsSplash.png",
+                "idiom": "universal",
+                "scale": "1x"
+              }
+            ],
+            "info": {
+              "author": "xcode",
+              "version": 1
+            }
+          }
+          JSON
+            git rm "$SVG"
+            git add "$PNG" "$IMAGESET/Contents.json"
+            echo "migrated=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "migrated=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          test -s "$PNG"
+          WIDTH="$(sips -g pixelWidth "$PNG" | awk '/pixelWidth/ {print $2}')"
+          HEIGHT="$(sips -g pixelHeight "$PNG" | awk '/pixelHeight/ {print $2}')"
+          echo "Splash dimensions: ${WIDTH}x${HEIGHT}"
+          test "$WIDTH" -eq 1600
+          test "$HEIGHT" -eq 900
+
+          if compgen -G "Gifski/Components/SplashImage*.swift" > /dev/null; then
+            echo "Obsolete embedded splash source still exists."
+            exit 1
+          fi
+
+      - name: Commit raster splash asset
+        if: steps.splash.outputs.migrated == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Rasterize splash artwork for reliable macOS rendering"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+
+      - name: Resolve packages
+        run: xcodebuild -resolvePackageDependencies -project Gifski.xcodeproj -scheme Gifski
+
+      - name: Test image sequence exports
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project Gifski.xcodeproj \
+            -scheme Gifski \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -derivedDataPath "$RUNNER_TEMP/TestDerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM="" \
+            -only-testing:GifskiTests/ImageSequenceTests \
+            test | tee "$RUNNER_TEMP/xcodebuild-tests.log"
+
+      - name: Build app
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project Gifski.xcodeproj \
+            -scheme Gifski \
+            -configuration Release \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM="" \
+            build | tee "$RUNNER_TEMP/xcodebuild.log"
+
+      - name: Locate app
+        id: app
+        run: |
+          APP_PATH="$(find "$RUNNER_TEMP/DerivedData/Build/Products/Release" -maxdepth 1 -name 'Gifski.app' -print -quit)"
+          test -n "$APP_PATH"
+          echo "path=$APP_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: Ad-hoc sign app
+        run: codesign --force --deep --sign - "${{ steps.app.outputs.path }}"
+
+      - name: Package DMG
+        run: |
+          mkdir -p "$RUNNER_TEMP/dmg"
+          cp -R "${{ steps.app.outputs.path }}" "$RUNNER_TEMP/dmg/Gif'in Stills.app"
+          ln -s /Applications "$RUNNER_TEMP/dmg/Applications"
+          hdiutil create \
+            -volname "Gif'in Stills" \
+            -srcfolder "$RUNNER_TEMP/dmg" \
+            -ov \
+            -format UDZO \
+            "$RUNNER_TEMP/GifIn-Stills.dmg"
+
+      - name: Upload DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: GifIn-Stills-DMG
+          path: ${{ runner.temp }}/GifIn-Stills.dmg
+          if-no-files-found: error
+
+      - name: Upload build logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcodebuild-logs
+          path: |
+            ${{ runner.temp }}/xcodebuild.log
+            ${{ runner.temp }}/xcodebuild-tests.log
+          if-no-files-found: ignore

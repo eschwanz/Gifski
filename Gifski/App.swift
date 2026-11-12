@@ -10,11 +10,11 @@ struct AppMain: App {
 	}
 
 	var body: some Scene {
-		Window(SSApp.name, id: "main") {
+		Window("Gif’in Stills", id: "main") {
 			MainScreen()
 				.environment(appState)
 		}
-		.windowResizability(.contentSize)
+		.windowResizability(.contentMinSize)
 		.windowToolbarStyle(.unifiedCompact)
 //		.windowBackgroundDragBehavior(.enabled) // Does not work. (macOS 15.2)
 		.defaultPosition(.center)
@@ -53,28 +53,24 @@ struct AppMain: App {
 			}
 			CommandGroup(replacing: .help) {
 				Link(
-					"Website",
-					systemImage: "safari",
-					destination: "https://sindresorhus.com/gifski"
-				)
-				Link(
-					"Source Code",
+					"Gif’in Stills Source",
 					systemImage: "chevron.left.forwardslash.chevron.right",
-					destination: "https://github.com/sindresorhus/Gifski"
+					destination: "https://github.com/eschwanz/Gifski"
 				)
 				Link(
-					"Gifski Library",
+					"Gifski Encoding Library",
 					systemImage: "shippingbox",
 					destination: "https://github.com/ImageOptim/gifski"
 				)
 				Divider()
-				RateOnAppStoreButton(appStoreID: "1351639930")
-				ShareAppButton(appStoreID: "1351639930")
-				Divider()
 				Button("Copy Logs", systemImage: "doc.on.clipboard") {
 					appState.copyDiagnosticLogs()
 				}
-				SendFeedbackButton()
+				Link(
+					"Report Issue",
+					systemImage: "exclamationmark.bubble",
+					destination: "https://github.com/eschwanz/Gifski/issues"
+				)
 			}
 		}
 		Settings {
@@ -87,7 +83,6 @@ struct AppMain: App {
 			"NSApplicationCrashOnExceptions": true
 		])
 
-		SSApp.initSentry("https://0ab0665326c54956f3caa10fc2f525d1@o844094.ingest.sentry.io/4505991507738624")
 
 		SSApp.setUpExternalEventListeners()
 	}

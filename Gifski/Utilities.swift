@@ -1737,12 +1737,7 @@ extension SSApp {
 	- Note: Call this lazily only when actually needed as otherwise it won't get the live info.
 	*/
 	static func appFeedbackUrl() -> URL {
-		let info: [String: String] = [
-			"product": name,
-			"metadata": debugInfo
-		]
-
-		return URL("https://sindresorhus.com/feedback").settingQueryItems(from: info)
+		URL("https://github.com/eschwanz/Gifski/issues")
 	}
 }
 
@@ -5507,8 +5502,12 @@ extension DropInfo {
 
 	The movie check also keeps us out of the way of screenshot drags, which use the same promise mechanism but promise a `public.png` file.
 	*/
+	var filePromiseReceivers: [NSFilePromiseReceiver] {
+		NSPasteboard(name: .drag).filePromiseReceivers
+	}
+
 	var firstMovieFilePromiseReceiver: NSFilePromiseReceiver? {
-		NSPasteboard(name: .drag).filePromiseReceivers.first { receiver in
+		filePromiseReceivers.first { receiver in
 			receiver.fileTypes.contains {
 				UTType($0)?.conforms(to: .movie) == true
 			}

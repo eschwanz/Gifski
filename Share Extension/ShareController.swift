@@ -34,7 +34,7 @@ final class ShareController: ExtensionController {
 
 	private func createMainAppUrl(queryItems: [URLQueryItem]) -> URL {
 		var components = URLComponents()
-		components.scheme = "gifski"
+		components.scheme = "gifinstills"
 		components.host = "shareExtension"
 		components.queryItems = queryItems
 		return components.url!
